@@ -1,0 +1,3 @@
+"""
+PricePilot AI - Schemas Package
+"""

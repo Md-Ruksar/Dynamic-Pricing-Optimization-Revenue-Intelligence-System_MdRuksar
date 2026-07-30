@@ -170,3 +170,23 @@ node_modules/
 frontend/dist/
 
 # Data upload directory
+# Freebuff
+.freebuff/
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# Vite
+frontend/.vite/
+
+# Local files
+nul
+frontend/nul
+
+# Python cache
+__pycache__/
