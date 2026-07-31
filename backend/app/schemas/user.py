@@ -50,6 +50,8 @@ class UserResponse(BaseModel):
     role: str
     is_active: bool
     google_id: Optional[str] = None
+    profile_picture: Optional[str] = None
+    is_google_user: Optional[bool] = False
     avatar_url: Optional[str] = None
     notifications_enabled: bool = True
     created_at: datetime
@@ -82,8 +84,6 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
-class GoogleLoginRequest(BaseModel):
-    """Schema for Google OAuth login."""
-    email: str
-    google_id: str
-    name: str = ""
+class GoogleIdTokenRequest(BaseModel):
+    """Schema for Google ID-token authentication."""
+    id_token: str

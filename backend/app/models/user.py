@@ -17,11 +17,13 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False, index=True)
     full_name = Column(String(100))
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)  # NULL for Google-only accounts
     role = Column(String(20), nullable=False, default="business_user")
     is_active = Column(Boolean, default=True)
-    google_id = Column(String(100), index=True)
-    avatar_url = Column(String(500))
+    google_id = Column(String(100), index=True, nullable=True)
+    profile_picture = Column(String(500), nullable=True)
+    is_google_user = Column(Boolean, default=False, nullable=True)
+    avatar_url = Column(String(500), nullable=True)
     notifications_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     

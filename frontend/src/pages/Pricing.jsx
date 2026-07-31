@@ -58,9 +58,8 @@ export default function Pricing() {
   }, []);
 
   useEffect(() => {
-    fetchProducts();
     fetchRecommendations();
-  }, [fetchProducts, fetchRecommendations]);
+  }, [fetchRecommendations]);
 
   useEffect(() => {
     const timer = setTimeout(() => fetchProducts(), 300);

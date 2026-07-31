@@ -46,3 +46,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+print("GOOGLE_CLIENT_ID =", settings.GOOGLE_CLIENT_ID)
+print("ENV FILE LOADED")

@@ -6,7 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ForecastingPanel from '../components/ForecastingPanel';
 import {
   BrainCircuit, Loader2, Sparkles, CheckCircle2, AlertCircle,
-  RefreshCw, TrendingUp, TrendingDown, ArrowRight, Search, Filter,
+  RefreshCw, TrendingUp, TrendingDown, ArrowRight, Search,
   Layers, Database, XCircle, Gauge, LineChart as LineChartIcon, Minus,
 } from 'lucide-react';
 
@@ -36,6 +36,13 @@ export default function AIPrediction() {
     } catch { /* ignore */ }
   }, []);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await productsAPI.getCategories();
+      setCategories(res.data);
+    } catch { /* ignore */ }
+  }, []);
+
   const fetchRecommendations = useCallback(async () => {
     try {
       const res = await pricingAPI.listRecommendations({ limit: 10 });
@@ -60,9 +67,9 @@ export default function AIPrediction() {
 
   useEffect(() => {
     fetchStatus();
+    fetchCategories();
     fetchRecommendations();
-    fetchProducts();
-  }, [fetchStatus, fetchRecommendations, fetchProducts]);
+  }, [fetchStatus, fetchCategories, fetchRecommendations]);
 
   useEffect(() => {
     const timer = setTimeout(() => fetchProducts(), 300);

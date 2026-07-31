@@ -119,15 +119,6 @@ export default function Register() {
               )}
             </div>
 
-            <div>
-              <label className="label">Role</label>
-              <select className="input" {...register('role')}>
-                <option value="business_user">Business User</option>
-                <option value="pricing_manager">Pricing Manager</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-
             <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {loading ? 'Creating account...' : 'Create account'}

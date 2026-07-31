@@ -1,61 +1,78 @@
 # PricePilot AI – Dynamic Pricing Optimization & Revenue Intelligence System
 
-**PricePilot AI** is an enterprise SaaS platform for dynamic pricing optimization, product catalog management, and revenue intelligence. Built as part of the Infosys 8-Week Virtual Internship, this system provides a production-ready solution for managing products, pricing, datasets, and users with a modern, professional UI.
+**PricePilot AI** is an enterprise AI SaaS platform for dynamic pricing optimization, demand forecasting, dataset-driven analytics, and revenue intelligence. It is a full-stack application (React + Vite + Tailwind on the frontend, FastAPI + SQLAlchemy on the backend) designed for Pricing Analysts, Business Analysts, and Revenue Managers — with an enterprise-grade UI in the spirit of Salesforce, HubSpot, and Power BI.
 
 ---
 
-## 🚀 Live Preview
+## ✨ What's Inside
 
-The application is currently running:
-
-| Service | URL | Status |
-|---------|-----|--------|
-| **Frontend** | `http://127.0.0.1:5173` | ✅ Vite Dev Server |
-| **Backend API** | `http://127.0.0.1:8000` | ✅ FastAPI |
-| **API Docs** | `http://127.0.0.1:8000/docs` | ✅ Swagger UI |
-| **Database** | SQLite (`backend/dynamic_pricing.db`) | ✅ Auto-seeded |
-
----
-
-## 📋 Table of Contents
-
-- [What We Built Today](#-what-we-built-today)
-- [Tech Stack](#-tech-stack)
-- [Architecture](#-architecture)
-- [Backend API](#-backend-api)
-- [Frontend Pages](#-frontend-pages)
-- [Database Schema](#-database-schema)
-- [Sample Products](#-sample-products)
-- [Dynamic Dataset Loading](#-dynamic-dataset-loading)
-- [Enterprise Color Scheme](#-enterprise-color-scheme)
-- [Feature Flags](#-feature-flags)
-- [Setup & Installation](#-setup--installation)
-- [Running the Application](#-running-the-application)
-- [API Credentials](#-api-credentials)
-- [Project Structure](#-project-structure)
+| Module | Status | Highlights |
+|--------|--------|------------|
+| **Authentication** | ✅ Complete | Register, Login, Logout, JWT access + **refresh tokens**, Forgot/Reset password, **Google Sign-In**, bcrypt hashing |
+| **Role-Based Access Control** | ✅ Complete | `admin`, `pricing_manager`, `business_user` — route & UI guards |
+| **Dashboard** | ✅ Complete | KPI cards, revenue trend, category distribution, price distribution, recent imports, latest activity — all from real APIs |
+| **Product Management** | ✅ Complete | Full CRUD, search, category filter, sort, pagination, CSV export, bulk delete / bulk status, status toggle |
+| **Pricing Management** | ✅ Complete | Manual price updates, price history, margin, AI recommendations with **approve / reject** workflow |
+| **AI Price Prediction** | ✅ Complete | Random Forest, XGBoost, Linear Regression — selects the best model, real training on your data |
+| **Demand Forecasting** | ✅ Complete | **Prophet** daily revenue forecasts per product with 80% confidence intervals, 6h cache, portfolio outlook |
+| **Dataset Management** | ✅ Complete | Upload CSV/Excel → validate → clean → dedupe → stats → preview → **import into catalog** |
+| **Reports** | ✅ Complete | Revenue, pricing, product, user, dataset reports with **CSV / Excel / PDF** export |
+| **Sales Analytics** | ✅ Complete | Revenue trends, channel/region/category breakdown over configurable windows |
+| **User Management** | ✅ Admin only | Create, update, delete, activate/deactivate, reset passwords, assign roles |
+| **Settings** | ✅ Complete | Profile, password change, dark/light theme, notification preferences |
 
 ---
 
-## 🎯 What We Built Today
+## 🚀 Quick Start
 
-### 1. Product Images That Match Their Names
-Replaced generic placeholder images with **curated Unsplash product photos** that visually match each product. Now every product card shows a real photo of what it is — headphones show headphones, running shoes show running shoes, coffee makers show coffee makers.
+### 1. Backend
 
-### 2. Enterprise SaaS Color Scheme
-Rebranded the entire UI from indigo/purple to a **professional enterprise blue** palette (`#3b82f6`). The new scheme is clean, professional, and consistent with enterprise SaaS platforms like Salesforce, HubSpot, and Stripe.
+```bash
+cd backend
+python -m venv venv
 
-### 3. Dynamic Dataset Loading
-Created **27 sample products** across two CSV files that can be dynamically loaded into the database via the Dataset Management page. The "Load from Server" buttons now work immediately, and you can upload your own CSV files with product data including image URLs.
+# Windows
+source venv/Scripts/activate
+# macOS / Linux
+# source venv/bin/activate
 
-### 4. Real-Time CRUD Operations
-Full **Create, Read, Update, Delete** operations for all products with instant UI updates. Products can be added with image URLs, edited in a modal, searched by name/SKU, filtered by category, and paginated.
+pip install -r requirements.txt
 
-### 5. Auto-Seeding on Startup
-The database automatically seeds **16 realistic products** with pricing history and activity logs every time the backend starts (if the database is empty). No manual setup required.
+# Configure environment (see .env.example)
+cp .env.example .env
+
+# Start the API (auto-runs schema migration + seeds on first boot)
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+- API: `http://localhost:8000`
+- Swagger docs: `http://localhost:8000/docs`
+
+### 2. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- App: `http://localhost:5173`
+- Vite proxies `/api` and `/loaders` to the backend on port 8000 — no CORS issues in development.
+
+### 3. Demo Admin
+
+The database is seeded with a demo admin on first startup:
+
+| Field | Value |
+|-------|-------|
+| Username | `admin` |
+| Password | `admin123` |
+
+Public self-registration always creates a `business_user` account — role assignment is **admin-only** (via the Users page / `POST /api/v1/users/`).
 
 ---
 
-## 💻 Tech Stack
+## 🧰 Tech Stack
 
 ### Backend
 
@@ -63,393 +80,332 @@ The database automatically seeds **16 realistic products** with pricing history 
 |-----------|---------|---------|
 | Python | 3.12+ | Core language |
 | FastAPI | 0.115.6 | Web framework & REST API |
-| SQLAlchemy | 2.0.36 | ORM & database management |
-| Pydantic | 2.13.4 | Data validation & schemas |
+| SQLAlchemy | 2.0.36 | ORM |
+| PostgreSQL | 15+ | Primary database (production-ready) |
+| SQLite | — | Zero-config fallback (set `DATABASE_URL=sqlite:///...`) |
+| MongoDB / Motor | 4.9 / 3.6 | Audit/document store (connects on startup) |
+| Pydantic + pydantic-settings | 2.13 | Validation & configuration |
 | Passlib + bcrypt | 1.7.4 | Password hashing |
-| python-jose | 3.3.0 | JWT token generation |
-| Uvicorn | 0.34.0 | ASGI server |
-| Pandas | 2.2.3 | CSV & data processing |
-| SQLite | — | Development database |
+| python-jose | 3.3.0 | JWT (access + refresh) |
+| Pandas / NumPy | 2.2.3 / 1.26 | Dataset processing |
+| openpyxl | 3.1.5 | Excel parsing/export |
+| scikit-learn | 1.6.0 | ML price optimization |
+| XGBoost | 2.1.3 | ML price optimization |
+| Prophet | 1.1.6 | Demand forecasting |
+| fpdf2 | 2.8.7 | PDF report export |
+| google-auth | 2.56.2 | Server-side Google ID token verification |
 
 ### Frontend
 
 | Technology | Version | Purpose |
 |-----------|---------|---------|
-| React | 19.2.8 | UI framework |
-| Vite | 6.4.3 | Build tool & dev server |
-| Tailwind CSS | 3.4.19 | Utility-first CSS |
-| React Router | 7.18.1 | Client-side routing |
-| Axios | 1.18.1 | HTTP client |
-| React Hook Form | 7.83.0 | Form validation |
-| Lucide React | 0.469.0 | Icon library |
-| Recharts | 2.15.4 | Charts & graphs |
+| React | 19.2 | UI framework |
+| Vite | 6.4 | Build tool & dev server |
+| Tailwind CSS | 3.4 | Utility-first styling (enterprise blue theme) |
+| React Router DOM | 7.18 | Client-side routing |
+| Axios | 1.18 | HTTP client with JWT interceptor + auto token refresh |
+| React Hook Form | 7.83 | Form validation |
+| Recharts | 2.15 | Charts & graphs |
+| Lucide React | 0.469 | Icons |
+| @react-oauth/google | 0.13 | Official Google Sign-In button |
+
+---
+
+## 🔐 Authentication & Security
+
+### Flow
+
+```
+Register ──► Hash password (bcrypt) ──► Store in PostgreSQL
+Login ──► Verify credentials ──► Generate JWT (access + refresh) ──► Client stores tokens
+Protected Routes ──► Axios attaches Bearer token ──► Role validation (401 / 403)
+Token expiry ──► Axios interceptor silently refreshes via /auth/refresh ──► Retry request
+```
+
+### Key behaviors
+
+- **JWT access tokens** expire in 30 minutes; **refresh tokens** in 7 days. The Axios response interceptor automatically refreshes on `401` and replays the queued request (single-flight refresh with subscriber queue).
+- **Google Sign-In** (`/api/v1/auth/google`) verifies the ID token **server-side** with Google's official `google-auth` library — signature, audience, issuer, expiry, and verified email. Claims come from the verified token, never from the frontend. Users are auto-created (`is_google_user=True`, `hashed_password=NULL`) or logged in if the email already exists.
+- A code-based OAuth flow (`/google/authorize` + `/google/callback`) is also implemented for server-to-server redirect flows.
+- **Passwords are hashed with bcrypt** via Passlib — never stored in plain text.
+- **Roles**: `admin` / `pricing_manager` / `business_user`. Missing Authorization headers return **401** (with `WWW-Authenticate`); authenticated-but-unauthorized users get **403**.
+- **Security hardening**: public registration cannot self-assign `admin` (always downgraded to `business_user`), self-deactivation/deletion is blocked, and the ML price engine is restricted to admin/pricing roles.
+
+### Environment variables
+
+**Backend** (`.env`):
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/dynamic_pricing
+SECRET_KEY=change-me-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
+
+# Google OAuth (optional — Google button shows only when set)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/google/callback
+
+# MongoDB (optional — connector skips gracefully if unavailable)
+MONGODB_URL=mongodb://localhost:27017
+MONGODB_DB_NAME=pricepilot_ai
+```
+
+**Frontend** (`frontend/.env`):
+
+```env
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+```
 
 ---
 
 ## 🏗 Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   FRONTEND (React + Vite)                │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │ Dashboard│ │ Products │ │ Pricing  │ │ Datasets │  │
-│  │   Page   │ │   Page   │ │   Page   │ │   Page   │  │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘  │
-│       │            │            │            │         │
-│  ┌────┴────────────┴────────────┴────────────┴────┐    │
-│  │           API Client (Axios)                    │    │
-│  │     Interceptors → JWT Token → Proxy /api      │    │
-│  └───────────────────────┬─────────────────────────┘    │
-└──────────────────────────┼──────────────────────────────┘
-                           │ HTTP (via Vite proxy or direct)
-┌──────────────────────────┼──────────────────────────────┐
-│                   BACKEND (FastAPI)                      │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│  │  Auth    │ │ Products │ │ Dashboard│ │ Pricing  │  │
-│  │  Router  │ │  Router  │ │  Router  │ │  Router  │  │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘  │
-│       │            │            │            │         │
-│  ┌────┴────────────┴────────────┴────────────┴────┐    │
-│  │           Service Layer                          │    │
-│  │  AuthService  ProductService  DashboardService   │    │
-│  └───────────────────────┬─────────────────────────┘    │
-│                          │                               │
-│  ┌───────────────────────┴─────────────────────────┐    │
-│  │        SQLAlchemy ORM → SQLite Database          │    │
-│  │  Users │ Products │ PricingHistory │ ActivityLog │    │
-│  └─────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                   FRONTEND (React + Vite + Tailwind)           │
+│  Pages: Login · Register · Dashboard · Products · Pricing ·    │
+│         AI Prediction · Datasets · Reports · Users · Settings  │
+│         ┌──────────────────────────────────────────────────┐  │
+│         │  AuthContext / ThemeContext / ToastContext        │  │
+│         │  Axios client: JWT interceptor + auto refresh     │  │
+│         └───────────────────────┬──────────────────────────┘  │
+└─────────────────────────────────┼─────────────────────────────┘
+                                  │ HTTP (Vite proxy /api, /loaders)
+┌─────────────────────────────────┼─────────────────────────────┐
+│                    BACKEND (FastAPI)                           │
+│  Routers: auth · users · products · pricing · datasets · ai ·  │
+│           dashboard · reports · sales · activity · loaders     │
+│         ┌──────────────────────────────────────────────────┐  │
+│         │  Service layer (business logic)                   │  │
+│         │  Auth · Product · Pricing · DatasetProcessing ·    │  │
+│         │  ML (RF/XGB/LR) · Forecast (Prophet) · Report ·   │  │
+│         │  Dashboard · Sales · Activity · Google OAuth       │  │
+│         └───────────────────────┬──────────────────────────┘  │
+│                                 │                              │
+│  PostgreSQL ── Users, Products, Sales, PricingHistory,        │
+│                Recommendations, Datasets, ImportLogs,          │
+│                ActivityLogs, ForecastRuns                      │
+│  MongoDB ── audit/document store (optional)                    │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-### Key Design Decisions
+### Key design decisions
 
-1. **Vite Dev Proxy**: In development, the frontend runs on port 5173 and Vite proxies `/api` and `/loaders` requests to the backend on port 8000 — no CORS issues.
-2. **JWT Authentication**: All API routes (except register/login) require a JWT bearer token. The frontend stores the token in `localStorage` and attaches it via Axios interceptor.
-3. **Feature Flags**: Future modules (AI pricing, forecasting, reports, analytics) have their backend APIs intact but are hidden from the frontend UI via `src/config/features.js`. Enabling them is a single flag flip.
-4. **Auto-Seed**: The backend automatically seeds 16 sample products with pricing history and activity logs on first startup. The seed is idempotent — it only runs once.
-
----
-
-## 🔌 Backend API
-
-### Milestone 1 (Active) — 18 Endpoints
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/api/v1/auth/register` | Public | Register a new user |
-| `POST` | `/api/v1/auth/login` | Public | Login, returns JWT token |
-| `GET` | `/api/v1/auth/me` | JWT | Get current user info |
-| `GET` | `/api/v1/dashboard/` | JWT | Dashboard statistics |
-| `GET` | `/api/v1/products/` | JWT | List products (paginated, searchable) |
-| `GET` | `/api/v1/products/{id}` | JWT | Get single product |
-| `POST` | `/api/v1/products/` | JWT | Create product |
-| `PUT` | `/api/v1/products/{id}` | JWT | Update product |
-| `DELETE` | `/api/v1/products/{id}` | JWT | Delete product |
-| `GET` | `/api/v1/products/categories/all` | JWT | List all categories |
-| `PUT` | `/api/v1/pricing/products/{id}/price` | JWT | Update product price |
-| `GET` | `/api/v1/pricing/products/{id}/history` | JWT | Get price history |
-| `GET` | `/api/v1/datasets/` | JWT | List datasets |
-| `GET` | `/api/v1/datasets/stats` | JWT | Dataset statistics |
-| `GET` | `/api/v1/users/` | JWT | List users (admin) |
-| `POST` | `/api/v1/users/` | JWT | Create user (admin) |
-| `PUT` | `/api/v1/users/{id}/status` | JWT | Toggle user status |
-| `DELETE` | `/api/v1/users/{id}` | JWT | Delete user (admin) |
-
-### Data Loaders — 4 Endpoints
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `POST` | `/loaders/retail-pricing` | JWT | Load retail CSV from server |
-| `POST` | `/loaders/retail-pricing/upload` | JWT | Upload retail CSV file |
-| `POST` | `/loaders/ecommerce-sales` | JWT | Load e-commerce CSV from server |
-| `POST` | `/loaders/ecommerce-sales/upload` | JWT | Upload e-commerce CSV file |
-
-### System — 1 Endpoint
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `GET` | `/health` | Public | Health check |
+1. **Non-destructive startup migration** (`migrate_schema` in `app/database.py`) — reconciles existing PostgreSQL/SQLite schemas against the current SQLAlchemy models by *adding* missing columns (never dropping data), makes `hashed_password` nullable for Google-only accounts, creates the `google_id` index, and backfills legacy renamed columns. Idempotent — safe to run on every boot.
+2. **Service layer** isolates business logic from routers; the ML, forecasting, and dataset-pipeline services are self-contained so future modules plug in without touching existing code.
+3. **Real ML, not mockups** — price optimization trains Random Forest / XGBoost / Linear Regression on your products and picks the best model; Prophet trains per product with confidence intervals. With insufficient data the API returns a clear message instead of fabricating numbers.
+4. **Vite dev proxy** avoids CORS during development; `VITE_API_URL` points the frontend at a deployed backend in production.
+5. **Feature-flag friendly** — hidden future modules (`frontend/src/modules/future/`) are preserved in the codebase and gated in `src/config/features.js`.
 
 ---
 
-## 🖥 Frontend Pages
+## 🔌 Backend API (`/api/v1`)
 
-| Page | Route | Description |
-|------|-------|-------------|
-| **Login** | `/login` | JWT authentication with username/password |
-| **Register** | `/register` | New user registration with role selection |
-| **Dashboard** | `/dashboard` | Stats: total products, active products, categories, avg price, dataset status, recent activity, quick actions |
-| **Products** | `/products` | Full CRUD with card grid view (images, prices, stock, margin, revenue), list view, search, category filter, pagination |
-| **Pricing** | `/pricing` | Manual price updates with change indicators, price history modal |
-| **Datasets** | `/datasets` | Load retail/e-commerce CSVs from server or upload your own, view stats and import logs |
-| **Users** | `/users` | Admin-only: create/edit users, assign roles, activate/deactivate |
-| **Settings** | `/settings` | Profile editing, password change, theme toggle (dark/light), system config |
+Interactive docs at **`http://localhost:8000/docs`** (Swagger UI). Auth-protected endpoints require `Authorization: Bearer <access_token>`.
 
-### UI Features
-- **Dark/Light Mode** — Persisted to localStorage, respects system preference
-- **Responsive Layout** — Works on desktop and tablet
-- **Grid/List View Toggle** — Switch between card and table views on Products page
-- **Animated Transitions** — Fade-in, slide-in, scale-in animations
-- **Glassmorphism Hover Effects** — Product card hover overlays
-- **Skeleton Loading States** — Placeholder UI while data loads
-- **Enterprise Typography** — Inter font family with JetBrains Mono for code/prices
+### Authentication (`/auth`)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `POST` | `/auth/register` | Public | Register (always creates `business_user`) |
+| `POST` | `/auth/login` | Public | Login → access + refresh tokens |
+| `POST` | `/auth/refresh` | Public | Exchange refresh token for a new pair |
+| `GET` | `/auth/me` | JWT | Current profile |
+| `PUT` | `/auth/me` | JWT | Update profile (name, email, notifications) |
+| `POST` | `/auth/change-password` | JWT | Change own password |
+| `GET` | `/auth/google/authorize` | Public | OAuth consent URL |
+| `GET` | `/auth/google/callback` | Public | OAuth code callback → JWT |
+| `POST` | `/auth/google` | Public | Verify Google ID token → login/register → JWT |
+| `POST` | `/auth/forgot-password` | Public | Request reset token |
+| `POST` | `/auth/reset-password` | Public | Set new password with token |
 
----
+### Dashboard
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/dashboard/` | JWT | KPIs, revenue trend, categories, price distribution, recent activity |
 
-## 🗄 Database Schema
+### Products (`/products`)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/products/` | JWT | List (pagination, search, category, status, sort) |
+| `GET` | `/products/{id}` | JWT | Single product |
+| `POST` | `/products/` | admin / pricing_manager | Create |
+| `PUT` | `/products/{id}` | admin / pricing_manager | Update |
+| `PATCH` | `/products/{id}/status` | admin / pricing_manager | Toggle active/inactive |
+| `DELETE` | `/products/{id}` | admin | Delete |
+| `POST` | `/products/bulk-delete` | admin | Bulk delete |
+| `POST` | `/products/bulk-status` | admin / pricing_manager | Bulk status update |
+| `GET` | `/products/categories/all` | JWT | Category list |
+| `GET` | `/products/export/csv` | JWT | Export filtered products as CSV |
 
-### Users
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | Integer (PK) | Auto-increment |
-| `username` | String(50) | Unique login name |
-| `email` | String(100) | Unique email |
-| `hashed_password` | String | bcrypt hash |
-| `full_name` | String(100) | Display name |
-| `role` | String(20) | admin, pricing_manager, business_user |
-| `is_active` | Boolean | Account status |
+### Pricing (`/pricing`)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `PUT` | `/pricing/products/{id}/price` | admin / pricing_manager | Manual price update + history entry |
+| `GET` | `/pricing/products/{id}/history` | JWT | Price change history |
+| `GET` | `/pricing/recommendations` | JWT | AI recommendations (filter by status) |
+| `POST` | `/pricing/recommendations/{id}/approve` | admin / pricing_manager | Apply recommended price |
+| `POST` | `/pricing/recommendations/{id}/reject` | admin / pricing_manager | Reject recommendation |
 
-### Products
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | Integer (PK) | Auto-increment |
-| `name` | String(200) | Product name |
-| `sku` | String(50) | Unique SKU |
-| `description` | Text | Product description |
-| `category` | String(100) | Product category |
-| `base_price` | Float | Original price |
-| `current_price` | Float | Current selling price |
-| `cost_price` | Float | Cost price (for margin calc) |
-| `image_url` | String(500) | Product image URL |
-| `stock_quantity` | Integer | Current inventory |
-| `revenue` | Float | Total revenue |
-| `status` | String(20) | active/inactive |
+### AI Engine (`/ai`)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/ai/status` | JWT | Engine status, model availability, data coverage |
+| `GET` | `/ai/forecast` | JWT | Portfolio demand outlook (fast trend analysis) |
+| `GET` | `/ai/forecast/{id}` | JWT | Prophet forecast (horizon 7–180 days, 80% CI, cached 6h, `force=true` retrains) |
+| `GET` | `/ai/optimize/{id}` | admin / pricing_manager | Price optimization; `include_forecast=true` folds demand signal in |
+| `POST` | `/ai/optimize/{id}/save` | admin / pricing_manager | Persist recommendation to approval workflow |
+| `GET` | `/ai/batch-optimize` | admin / pricing_manager | Optimize whole catalog (optional category filter) |
+| `POST` | `/ai/predict-revenue/{id}` | admin / pricing_manager | Revenue impact of a proposed price |
 
-### Pricing History
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | Integer (PK) | Auto-increment |
-| `product_id` | Integer (FK) | Reference to products |
-| `old_price` | Float | Previous price |
-| `new_price` | Float | Updated price |
-| `change_reason` | String(200) | Reason for change |
-| `changed_by` | Integer | User who made change |
-| `changed_at` | DateTime | Timestamp |
+### Datasets (`/datasets`)
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/datasets/` | JWT | List processed datasets + stats |
+| `POST` | `/datasets/upload` | admin / pricing_manager | Upload CSV/Excel → validate → clean → dedupe → stats → store |
+| `POST` | `/datasets/{id}/import` | admin / pricing_manager | Import processed dataset into the product catalog |
+| `GET` | `/datasets/{id}/preview` | JWT | Preview rows, pipeline steps, statistics |
+| `GET` | `/datasets/stats` | JWT | Summary stats + import logs |
+| `GET` | `/datasets/types` | JWT | Supported dataset type templates |
 
-### Activity Log
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | Integer (PK) | Auto-increment |
-| `action` | String(200) | Action description |
-| `resource_type` | String(50) | Type of resource |
-| `resource_id` | Integer | Resource identifier |
-| `details` | Text | Additional context |
-| `user_id` | Integer | User who performed action |
-| `created_at` | DateTime | Timestamp |
+### Users (`/users`) — admin only
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/users/` | List all users |
+| `POST` | `/users/` | Create user (any role) |
+| `PUT` | `/users/{id}` | Update role / name / email / status |
+| `POST` | `/users/{id}/reset-password` | Admin resets a password |
+| `PUT` | `/users/{id}/status` | Activate / deactivate |
+| `DELETE` | `/users/{id}` | Delete user |
 
----
+### Reports (`/reports`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/reports/revenue` | Revenue analysis |
+| `GET` | `/reports/pricing-performance` | Pricing performance (over/under-priced) |
+| `GET` | `/reports/product-performance` | Product performance |
+| `GET` | `/reports/users` | Users report |
+| `GET` | `/reports/datasets` | Datasets report |
+| `GET` | `/reports/export?report_type=…&format=csv\|xlsx\|pdf` | Download report |
 
-## 📦 Sample Products
+### Sales & Activity
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| `GET` | `/sales/analytics?days=…` | JWT | Revenue analytics over a window (1–365 days) |
+| `GET` | `/activity/logs` | JWT | Recent activity log |
 
-The database auto-seeds **16 realistic products** across **6 categories** on first startup:
+> **Note:** The legacy loaders and the health endpoint below are mounted at the **root** (`/loaders/…`, `/health`), not under `/api/v1`.
 
-| # | Product | Category | Price | Stock | Image |
-|---|---------|----------|-------|-------|-------|
-| 1 | Wireless Noise-Cancelling Headphones Pro | Electronics | $199.99 | 145 | ✅ |
-| 2 | Organic Cotton Casual Shirt | Clothing | $39.99 | 320 | ✅ |
-| 3 | Smart Fitness Watch Ultra | Electronics | $279.99 | 89 | ✅ |
-| 4 | Professional Chef's Knife Set | Home & Kitchen | $89.99 | 67 | ✅ |
-| 5 | Ergonomic Office Chair Pro | Furniture | $399.99 | 34 | ✅ |
-| 6 | Stainless Steel Water Bottle 32oz | Sports & Outdoors | $29.99 | 512 | ✅ |
-| 7 | Bluetooth Portable Speaker Boom | Electronics | $69.99 | 203 | ✅ |
-| 8 | Bamboo Cutting Board Set | Home & Kitchen | $34.99 | 178 | ✅ |
-| 9 | Ultralight Running Shoes | Clothing | $89.99 | 156 | ✅ |
-| 10 | Smart LED Desk Lamp | Electronics | $49.99 | 234 | ✅ |
-| 11 | Premium Yoga Mat | Sports & Outdoors | $34.99 | 289 | ✅ |
-| 12 | French Press Coffee Maker | Home & Kitchen | $32.99 | 167 | ✅ |
-| 13 | Minimalist Leather Wallet | Accessories | $44.99 | 198 | ✅ |
-| 14 | Mechanical Gaming Keyboard RGB | Electronics | $129.99 | 92 | ✅ |
-| 15 | Himalayan Salt Lamp | Home & Kitchen | $24.99 | 412 | ✅ |
-| 16 | Canvas Backpack Travel Pro | Accessories | $74.99 | 123 | ✅ |
+### Data loaders (legacy, server-side CSVs)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/loaders/retail-pricing` · `/loaders/retail-pricing/upload` | Load/upload retail pricing CSV |
+| `POST` | `/loaders/ecommerce-sales` · `/loaders/ecommerce-sales/upload` | Load/upload e-commerce sales CSV |
 
-All images are sourced from **Unsplash** with curated photos that visually match each product name.
-
----
-
-## 📊 Dynamic Dataset Loading
-
-The system supports dynamic dataset loading via the **Dataset Management** page:
-
-### Server-Loaded Datasets
-
-| Dataset | File | Products | How to Load |
-|---------|------|----------|-------------|
-| Retail Pricing | `backend/data_uploaded/retail_pricing.csv` | 15 products | Click "Load from Server" on Retail card |
-| E-commerce Sales | `backend/data_uploaded/ecommerce_sales.csv` | 12 products | Click "Load from Server" on E-commerce card |
-
-### Custom CSV Upload
-
-You can upload your own CSV files with these supported column names:
-
-| CSV Column(s) | Maps To | Required |
-|---------------|---------|----------|
-| `name`, `product_name` | Product name | ✅ |
-| `sku`, `product_sku` | SKU | ✅ |
-| `category`, `product_category` | Category | Optional |
-| `current_price`, `price`, `selling_price` | Current price | ✅ |
-| `base_price`, `original_price` | Base price | Optional |
-| `cost_price`, `cost` | Cost price | Optional |
-| `description` | Description | Optional |
-| `stock_quantity`, `stock`, `quantity` | Stock count | Optional |
-| `revenue` | Revenue | Optional |
-| `image_url`, `image`, `product_image` | Image URL | Optional |
-
-**Note**: Duplicate SKUs are automatically skipped during import.
+### System
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check (status, version) |
 
 ---
 
-## 🎨 Enterprise Color Scheme
+## 🖥 Frontend Pages & Routes
 
-The UI uses a professional **enterprise blue** primary palette (`#3b82f6`):
+| Page | Route | Access | Description |
+|------|-------|--------|-------------|
+| Login | `/login` | Public | Username/password + official Google button |
+| Register | `/register` | Public | Self-registration (business_user) |
+| Forgot Password | `/forgot-password` | Public | Request reset |
+| Reset Password | `/reset-password` | Public | Set new password |
+| Dashboard | `/dashboard` | JWT | KPI cards, revenue trend, category & price distribution, activity |
+| Products | `/products` | JWT | Enterprise data table — search, filters, sort, pagination, CRUD modals, bulk actions, CSV export, small thumbnails |
+| Pricing | `/pricing` | JWT | Manual price updates, margin, price history, AI recommendation review (approve/reject) |
+| AI Prediction | `/ai` | JWT | Model status, price optimization with factors/confidence/revenue impact, **Forecasting tab** with confidence bands |
+| Datasets | `/datasets` | JWT | Upload, pipeline status, statistics, health score, preview table, import to catalog, import logs |
+| Reports | `/reports` | JWT | Revenue/pricing/product/user/dataset reports + CSV/Excel/PDF download |
+| Users | `/users` | Admin | User CRUD, roles, activate/deactivate, reset password |
+| Settings | `/settings` | JWT | Profile, password, dark/light theme, notifications |
 
-```css
-/* Primary palette (Tailwind) */
-primary: {
-  50:  '#eff6ff',   /* Lightest */
-  100: '#dbeafe',
-  200: '#bfdbfe',
-  300: '#93c5fd',
-  400: '#60a5fa',
-  500: '#3b82f6',   /* Primary */
-  600: '#2563eb',   /* Buttons */
-  700: '#1d4ed8',   /* Hover */
-  800: '#1e40af',   /* Active */
-  900: '#1e3a8a',
-  950: '#172554',   /* Darkest */
-}
+### UI features
+- Enterprise design system — professional spacing, Inter typography, blue primary palette, rounded cards, soft shadows.
+- Full **dark / light mode** (persisted, respects system preference).
+- Loading spinners, **skeleton loaders**, success/error **toasts**, and **confirmation dialogs** — no ugly default alerts.
+- Responsive layout, animated transitions, and a protected-route guard that redirects unauthenticated users to `/login`.
+
+---
+
+## 🗄 Database Schema (PostgreSQL)
+
+| Table | Purpose |
+|-------|---------|
+| `users` | Accounts — `username`, `email`, `hashed_password` (nullable), `role`, `is_active`, `google_id`, `profile_picture`, `is_google_user`, `notifications_enabled` |
+| `products` | Catalog — name, sku, category, base/current/cost price, stock, revenue, status, image_url |
+| `sales` | Transactions — product, quantity, unit price, total, `sale_date`, channel, region, `customer_segment` |
+| `pricing_history` | Old/new price, AI suggested price, reason, changed_by |
+| `recommendations` | AI suggestions — recommended price, confidence, `factors_considered`, `expected_revenue_impact`, status (pending/applied/rejected) |
+| `datasets` | Processed uploads — rows, columns, missing values, duplicates, health score, column names, preview rows, pipeline steps |
+| `import_logs` | Import/upload audit trail |
+| `activity_logs` | User actions across the app |
+| `forecast_runs` | Prophet forecast cache (per product/horizon) |
+
+All relationships use proper foreign keys, unique constraints (username, email, sku), and indexes (including `ix_users_google_id`).
+
+---
+
+## 🧠 AI Engine — How It Works
+
+### Price optimization
+1. `GET /api/v1/ai/status` — reports data coverage, available models, and existing recommendations.
+2. `GET /api/v1/ai/optimize/{product_id}` — builds features from price, cost, stock, demand, category, and historical sales; trains Random Forest, XGBoost, and Linear Regression (with train/test split where data allows) and picks the **best-performing model**.
+3. Returns **current vs suggested price, confidence, expected revenue impact, price difference, reason, and key factors**. With insufficient data, it returns a clear explanation instead of a guess.
+4. `include_forecast=true` folds the Prophet demand signal into the suggestion (conservative in declining demand, room to test higher in rising demand).
+5. Recommendations can be saved (`/ai/optimize/{id}/save`) into the approval workflow and then **approved** (price applied + history entry) or **rejected** on the Pricing page.
+
+### Demand forecasting (Prophet)
+- `GET /api/v1/ai/forecast/{product_id}?horizon=30` trains a Prophet model on the product's daily revenue history and returns `yhat` / `yhat_lower` / `yhat_upper` **80% confidence intervals**, the historical series, and growth metrics.
+- Cached for **6 hours** per horizon; `force=true` retrains.
+- `GET /api/v1/ai/forecast` returns a fast portfolio outlook across the whole catalog.
+
+---
+
+## 📊 Dataset Pipeline
+
+Uploads (CSV or Excel) run through a real processing pipeline and the results are stored:
+
+```
+Upload ──► Validate columns & types ──► Clean missing values
+   ──► Remove duplicate rows ──► Convert data types ──► Generate statistics
+   ──► Build preview table ──► Store processed dataset ──► Import into catalog
 ```
 
-### Design System
-- **Cards**: White background, subtle borders, hover shadow elevation
-- **Buttons**: Blue primary with subtle blue shadow, clean secondary/ghost variants
-- **Forms**: Rounded inputs with blue focus ring, consistent spacing
-- **Badges**: Color-coded (green = success, amber = warning, red = danger, blue = info)
-- **Typography**: Inter for body text, JetBrains Mono for prices/code
-- **Dark Mode**: Full dark theme with slate-based surfaces
-- **Animations**: Subtle fade/slide/scale transitions on page load and interactions
+Reported per dataset: **rows, columns, missing values, duplicate count, category count, average price, total revenue, top products, and a health score**. Preview rows and the pipeline steps are stored and visible in the UI.
+
+**Supported CSV column aliases** (case-insensitive): `name|product_name`, `sku|product_sku`, `category|product_category`, `current_price|price|selling_price`, `base_price|original_price`, `cost_price|cost`, `stock_quantity|stock|quantity`, `revenue`, `description`, `image_url|image|product_image`. Duplicate SKUs are skipped on import.
 
 ---
 
-## 🚩 Feature Flags
+## 📦 Sample Data & Seed Scripts
 
-All future modules are preserved in the codebase but hidden from the UI. Controlled via `frontend/src/config/features.js`:
+The backend auto-seeds on first startup (`seed_data.py`): **16 realistic products** with matching Unsplash images, pricing history, 30 days of sales transactions, a demo admin (`admin` / `admin123`), and activity logs. Seeding is idempotent — it skips if products already exist.
 
-```javascript
-// Milestone 1 — Active
-DASHBOARD:     true    ✅
-PRODUCTS:      true    ✅
-PRICING:       true    ✅
-DATASETS:      true    ✅
-USERS:         true    ✅
-SETTINGS:      true    ✅
+For richer AI training, two generator scripts produce deterministic (seed 42) datasets:
 
-// Future — Hidden (set to true to enable)
-AI_PRICING:           false  ❌
-FORECASTING:          false  ❌
-REPORTS:              false  ❌
-ANALYTICS:            false  ❌
-REVENUE_INTELLIGENCE: false  ❌
-RECOMMENDATIONS:      false  ❌
-ADVANCED_ANALYTICS:   false  ❌
-BUSINESS_INTELLIGENCE:false  ❌
-PREDICTIVE_INSIGHTS:  false  ❌
-```
-
----
-
-## 🔧 Setup & Installation
-
-### Prerequisites
-- Python 3.12+
-- Node.js 18+
-- npm or yarn
-
-### Backend Setup
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-
-# Activate it
-# Windows:
-source venv/Scripts/activate
-# macOS/Linux:
-# source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env if needed (SQLite is used by default)
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-```
-
----
-
-## 🚀 Running the Application
-
-### Start Backend
+| Script | Output |
+|--------|--------|
+| `backend/scripts/generate_retail_dataset.py` | **520-product retail catalog** (`backend/data_uploaded/retail_catalog_520.csv`) across 14 categories — prices, costs, stock, 6-month revenue estimates |
+| `backend/scripts/seed_sales_history.py` | **180 days of daily sales** for every product (non-destructive, skips days that already have sales) |
 
 ```bash
 cd backend
 source venv/Scripts/activate
-python -m uvicorn app.main:app --reload --port 8000
 
-# The database auto-seeds on first startup.
-# API available at: http://localhost:8000
-# Swagger docs at: http://localhost:8000/docs
+python scripts/generate_retail_dataset.py   # writes retail_catalog_520.csv
+python scripts/seed_sales_history.py        # backfills 6 months of sales
 ```
 
-### Start Frontend
-
-```bash
-cd frontend
-npm run dev
-
-# Available at: http://localhost:5173
-# Vite proxies /api and /loaders to backend at port 8000
-```
-
----
-
-## 🔐 API Credentials
-
-On first startup, register a new admin user:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "email": "admin@pricepilot.io",
-    "password": "admin123",
-    "full_name": "System Admin",
-    "role": "admin"
-  }'
-```
-
-Then log in with these credentials on the login page:
-- **Username**: `admin`
-- **Password**: `admin123`
+Load the generated catalog through the **Datasets page** (upload → import) or the API so the ML models and charts train on 500+ products.
 
 ---
 
@@ -458,92 +414,43 @@ Then log in with these credentials on the login page:
 ```
 backend/
 ├── app/
-│   ├── __init__.py
-│   ├── main.py               # FastAPI entry point
-│   ├── config.py              # Pydantic settings
-│   ├── database.py            # SQLAlchemy setup
-│   ├── mongodb.py             # MongoDB connector
-│   ├── dependencies.py        # Auth guards & dependencies
-│   ├── utils.py               # Helpers (hashing, JWT)
-│   ├── seed_data.py           # 16 sample products with images
-│   ├── models/                # SQLAlchemy models
-│   │   ├── user.py
-│   │   ├── product.py
-│   │   ├── pricing_history.py
-│   │   ├── activity_log.py
-│   │   ├── sales.py
-│   │   └── recommendation.py
-│   ├── schemas/               # Pydantic schemas
-│   │   ├── user.py
-│   │   ├── product.py
-│   │   ├── pricing.py
-│   │   ├── dashboard.py
-│   │   ├── sales.py
-│   │   └── common.py
-│   ├── services/              # Business logic
-│   │   ├── auth.py
-│   │   ├── product.py
-│   │   ├── dashboard.py
-│   │   ├── pricing_service.py
-│   │   ├── activity_service.py
-│   │   ├── sales_service.py
-│   │   └── ml_service.py
-│   ├── routers/               # API route handlers
-│   │   ├── auth.py
-│   │   ├── products.py
-│   │   ├── dashboard.py
-│   │   ├── pricing.py
-│   │   ├── datasets.py
-│   │   ├── users.py
-│   │   ├── activity.py
-│   │   ├── ai.py
-│   │   ├── reports.py
-│   │   └── sales.py
-│   └── loaders/               # CSV data loaders
-│       ├── base_loader.py
-│       ├── retail_loader.py
-│       └── ecommerce_loader.py
-├── data_uploaded/             # Sample CSV datasets
-│   ├── retail_pricing.csv     # 15 products
-│   └── ecommerce_sales.csv    # 12 products
-├── .env                       # Environment config
-├── .env.example               # Template for .env
-└── requirements.txt           # Python dependencies
+│   ├── main.py               # FastAPI entry (lifespan: migrate → create_all → seed → Mongo)
+│   ├── config.py             # Pydantic settings (.env)
+│   ├── database.py           # Engine, session, non-destructive schema migration
+│   ├── mongodb.py            # MongoDB connector (optional)
+│   ├── dependencies.py       # Auth guards (get_current_user, require_role)
+│   ├── utils.py              # Hashing, JWT helpers
+│   ├── seed_data.py          # 16 products + demo admin + sales + activity
+│   ├── models/               # user, product, sales, pricing_history,
+│   │                         #   recommendation, dataset, activity_log, forecast
+│   ├── schemas/              # Pydantic models per module
+│   ├── services/             # auth, product, pricing_service, dataset_service,
+│   │                         #   ml_service, forecast_service, report_service,
+│   │                         #   sales_service, activity_service, google_oauth, dashboard
+│   ├── routers/              # auth, users, products, pricing, datasets, ai,
+│   │                         #   dashboard, reports, sales, activity
+│   └── loaders/              # base/retail/ecommerce CSV loaders
+├── scripts/
+│   ├── generate_retail_dataset.py   # 520-product CSV generator
+│   └── seed_sales_history.py        # 180-day sales backfill
+├── data_uploaded/            # Sample CSVs
+├── requirements.txt
+└── .env.example
 
 frontend/
 ├── src/
-│   ├── main.jsx               # React entry point
-│   ├── App.jsx                 # Routes & auth guards
-│   ├── index.css               # Tailwind + design system
-│   ├── api/
-│   │   └── client.js           # Axios client & API wrappers
-│   ├── config/
-│   │   └── features.js         # Feature flags
-│   ├── context/
-│   │   ├── AuthContext.jsx      # Auth state management
-│   │   └── ThemeContext.jsx     # Dark/light mode
-│   ├── components/
-│   │   ├── Layout.jsx           # App shell
-│   │   ├── Sidebar.jsx         # Navigation sidebar
-│   │   └── Header.jsx          # Top header bar
-│   ├── pages/
-│   │   ├── Login.jsx           # Login page
-│   │   ├── Register.jsx        # Registration page
-│   │   ├── Dashboard.jsx       # Statistics dashboard
-│   │   ├── Products.jsx        # Product CRUD with images
-│   │   ├── Pricing.jsx         # Manual pricing
-│   │   ├── Datasets.jsx        # Dataset management
-│   │   ├── Users.jsx           # User management (admin)
-│   │   └── Settings.jsx        # Profile & config
-│   └── modules/future/         # Future module placeholders
-│       ├── ai/
-│       ├── forecasting/
-│       ├── reports/
-│       ├── analytics/
-│       └── revenue/
-├── tailwind.config.js          # Tailwind config with enterprise colors
-├── vite.config.ts              # Vite config with API proxy
-└── package.json                # Frontend dependencies
+│   ├── main.jsx / App.jsx    # Entry + routes (protected/admin/public guards)
+│   ├── index.css             # Tailwind design system
+│   ├── api/client.js         # Axios + JWT interceptor + auto-refresh + typed APIs
+│   ├── config/features.js    # Feature flags
+│   ├── context/              # AuthContext, ThemeContext, ToastContext
+│   ├── components/           # Layout, Sidebar, Header, shared UI
+│   ├── pages/                # Login, Register, Forgot/ResetPassword, Dashboard,
+│   │                         #   Products, Pricing, AIPrediction, Datasets,
+│   │                         #   Reports, Users, Settings
+│   └── modules/future/       # Gated future modules (preserved)
+├── vite.config.ts            # Dev proxy /api + /loaders → :8000
+└── package.json
 ```
 
 ---
@@ -551,32 +458,37 @@ frontend/
 ## 🧪 Verification
 
 ```bash
-# Check backend health
+# Health check
 curl http://localhost:8000/health
 
-# Register admin user
-curl -X POST http://localhost:8000/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","email":"admin@pricepilot.io","password":"admin123","full_name":"Admin","role":"admin"}'
-
-# Login and get token
+# Login → token
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}' \
   | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
-# List products (should return 16 seeded products)
-curl -s http://localhost:8000/api/v1/products/ \
-  -H "Authorization: Bearer $TOKEN" | python -m json.tool
-
-# View dashboard stats
+# Dashboard with real data
 curl -s http://localhost:8000/api/v1/dashboard/ \
   -H "Authorization: Bearer $TOKEN" | python -m json.tool
 
-# Load dynamic retail dataset
-curl -s -X POST http://localhost:8000/loaders/retail-pricing \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+# AI engine status
+curl -s http://localhost:8000/api/v1/ai/status \
+  -H "Authorization: Bearer $TOKEN" | python -m json.tool
+
+# Optimize a product's price
+curl -s "http://localhost:8000/api/v1/ai/optimize/1?include_forecast=true" \
+  -H "Authorization: Bearer $TOKEN" | python -m json.tool
+
+# Prophet demand forecast
+curl -s "http://localhost:8000/api/v1/ai/forecast/1?horizon=30" \
+  -H "Authorization: Bearer $TOKEN" | python -m json.tool
+
+# Download a PDF report
+curl -s -o report.pdf "http://localhost:8000/api/v1/reports/export?report_type=revenue&format=pdf" \
+  -H "Authorization: Bearer $TOKEN"
 ```
+
+**Frontend**: `cd frontend && npm run build` (production build) — then serve `dist/` behind any static host.
 
 ---
 
@@ -587,5 +499,5 @@ MIT License — see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-  <sub>Built with ❤️ for the Infosys 8-Week Virtual Internship</sub>
+  <sub>PricePilot AI — Dynamic Pricing Optimization & Revenue Intelligence System</sub>
 </div>

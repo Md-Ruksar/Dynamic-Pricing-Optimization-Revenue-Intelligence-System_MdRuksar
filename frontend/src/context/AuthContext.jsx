@@ -48,8 +48,8 @@ export function AuthProvider({ children }) {
     return response.data;
   };
 
-  const googleLogin = async (data) => {
-    const response = await authAPI.googleLogin(data);
+  const googleLogin = async (idToken) => {
+    const response = await authAPI.google(idToken);
     return storeSession(response.data);
   };
 

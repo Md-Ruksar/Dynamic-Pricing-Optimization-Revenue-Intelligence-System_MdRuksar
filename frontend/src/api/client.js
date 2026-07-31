@@ -113,8 +113,7 @@ export const authAPI = {
   updateMe: (data) => apiClient.put('/api/v1/auth/me', data),
   changePassword: (data) => apiClient.post('/api/v1/auth/change-password', data),
   refresh: (refreshToken) => apiClient.post('/api/v1/auth/refresh', { refresh_token: refreshToken }),
-  googleLogin: (data) => apiClient.post('/api/v1/auth/google-login', data),
-  googleAuthorize: () => apiClient.get('/api/v1/auth/google/authorize'),
+  google: (idToken) => apiClient.post('/api/v1/auth/google', { id_token: idToken }),
   forgotPassword: (email) => apiClient.post('/api/v1/auth/forgot-password', { email }),
   resetPassword: (token, newPassword) => apiClient.post('/api/v1/auth/reset-password', { token, new_password: newPassword }),
 };

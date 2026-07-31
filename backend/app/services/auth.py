@@ -42,6 +42,8 @@ class AuthService:
             "role": user.role,
             "is_active": user.is_active,
             "google_id": user.google_id,
+            "profile_picture": user.profile_picture,
+            "is_google_user": user.is_google_user,
             "avatar_url": user.avatar_url,
             "notifications_enabled": user.notifications_enabled,
             "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -75,7 +77,7 @@ class AuthService:
     def login(self, username: str, password: str) -> dict:
         """Authenticate a user and return token pair."""
         user = self.db.query(User).filter(User.username == username).first()
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not user.hashed_password or not verify_password(password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials",
@@ -107,6 +109,11 @@ class AuthService:
 
     def change_password(self, user: User, current_password: str, new_password: str) -> dict:
         """Change the current user's password after verifying the current one."""
+        if not user.hashed_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This account uses Google sign-in and has no password to change",
+            )
         if not verify_password(current_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -137,12 +144,17 @@ class AuthService:
         self.db.refresh(user)
         return user
     
-    def google_login(self, email: str, google_id: str, name: str) -> dict:
-        """Authenticate or register a user via Google OAuth."""
+    def google_login(self, email: str, google_id: str, name: str, picture: str = "") -> dict:
+        """Authenticate or register a user via a verified Google profile.
+
+        The caller (router layer) is responsible for verifying the Google ID
+        token server-side before calling this method. This method only persists
+        the verified claims and issues tokens.
+        """
         user = self.db.query(User).filter(User.email == email).first()
         
         if not user:
-            # Create a new user from Google profile
+            # Create a new user from the verified Google profile
             username = email.split("@")[0]
             base_username = username
             counter = 1
@@ -154,9 +166,12 @@ class AuthService:
                 username=username,
                 email=email,
                 full_name=name,
-                hashed_password=hash_password(secrets.token_urlsafe(16)),
+                hashed_password=None,  # Google-only account: no password
                 role="business_user",
-                google_id=google_id or f"google_{email}",
+                google_id=google_id,
+                profile_picture=picture,
+                is_google_user=True,
+                avatar_url=picture,
             )
             self.db.add(user)
             self.db.commit()
@@ -166,6 +181,17 @@ class AuthService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is deactivated",
             )
+        else:
+            # Existing user: link the Google identity if not already linked
+            if user.google_id != google_id:
+                user.google_id = google_id
+            if picture and user.profile_picture != picture:
+                user.profile_picture = picture
+                user.avatar_url = picture
+            if not user.is_google_user:
+                user.is_google_user = True
+            self.db.commit()
+            self.db.refresh(user)
         
         return self._issue_tokens(user)
     

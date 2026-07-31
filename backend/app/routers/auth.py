@@ -11,17 +11,24 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, GoogleIdTokenRequest
 from app.schemas.common import MessageResponse
 from app.services.auth import AuthService
+from app.services.google_oauth import GoogleOAuthService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user."""
+    """Register a new user.
+
+    Public self-registration always creates a ``business_user`` account.
+    Role assignment is restricted to admins via the User Management endpoints
+    (POST /api/v1/users/), so a client can never self-assign admin privileges.
+    """
     auth_service = AuthService(db)
+    user_data = user_data.model_copy(update={"role": "business_user"})
     user = auth_service.register(user_data)
     return user
 
@@ -146,19 +153,25 @@ async def google_callback(
     return result
 
 
-@router.post("/google-login", response_model=Dict)
-def google_login(
-    body: Dict = Body(...),
+@router.post("/google", response_model=Dict)
+def google_auth(
+    body: GoogleIdTokenRequest,
     db: Session = Depends(get_db),
 ):
-    """Authenticate or register via Google profile (used by frontend fallback flow).
-    Accepts { "email": "...", "google_id": "...", "name": "..." }
+    """Authenticate or register a user via a Google ID token.
+
+    The ID token is verified server-side with Google's official verification
+    (signature, audience, issuer, expiry, verified email). Claims come from the
+    token itself - never from the frontend. Returns the same JWT pair as the
+    username/password login.
     """
+    profile = GoogleOAuthService().verify_id_token(body.id_token)
     auth_service = AuthService(db)
     result = auth_service.google_login(
-        email=body["email"],
-        google_id=body.get("google_id", ""),
-        name=body.get("name", body["email"].split("@")[0]),
+        email=profile["email"],
+        google_id=profile["google_id"],
+        name=profile["name"],
+        picture=profile["picture"],
     )
     return result
 

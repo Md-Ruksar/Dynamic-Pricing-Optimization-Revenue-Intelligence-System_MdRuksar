@@ -11,7 +11,9 @@ from app.database import get_db
 from app.utils import decode_access_token
 from app.models.user import User
 
-security = HTTPBearer()
+# auto_error=False so a missing Authorization header yields 401 (not FastAPI's
+# default 403), which is the correct semantics for an unauthenticated request.
+security = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
@@ -19,6 +21,12 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """Dependency that extracts and validates the JWT token, returning the current user."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     token = credentials.credentials
     payload = decode_access_token(token)
     if payload is None:

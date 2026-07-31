@@ -21,7 +21,9 @@ class SalesService:
         """Get sales analytics for the specified period."""
         since = datetime.utcnow() - timedelta(days=days)
         
-        sales_query = self.db.query(Sale).filter(Sale.created_at >= since)
+        # Filter on the business date (sale_date) so the window reflects actual
+        # sales activity, not the row's insertion timestamp (created_at).
+        sales_query = self.db.query(Sale).filter(Sale.sale_date >= since)
         total_sales = sales_query.count()
         
         revenue_data = (
