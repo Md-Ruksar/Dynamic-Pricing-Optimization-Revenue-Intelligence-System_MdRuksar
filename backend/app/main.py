@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import engine, Base
 from app.mongodb import mongo_db
 
-# Core routers (Milestone 1)
+# Core routers
 from app.routers import auth
 from app.routers import products
 from app.routers import dashboard
@@ -19,7 +19,7 @@ from app.routers import pricing
 from app.routers import datasets
 from app.routers import users
 
-# Future modules (code kept intact, routes hidden from UI until Milestone 2+)
+# Enterprise modules
 from app.routers import ai
 from app.routers import reports
 from app.routers import sales
@@ -34,7 +34,13 @@ from app.seed_data import seed_database
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    # Create database tables on startup
+    # Non-destructive migration for pre-existing databases (adds new columns/tables)
+    from app.database import migrate_schema
+    migrate_schema()
+
+    # Create database tables on startup (includes new Dataset / ImportLog / Recommendation models)
+    import app.models.dataset  # noqa: F401 - register models
+    import app.models.recommendation  # noqa: F401
     Base.metadata.create_all(bind=engine)
     
     # Seed sample products if database is empty
@@ -76,16 +82,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# API Routes - Milestone 1 (Active)
+# API Routes
 app.include_router(auth.router)
 app.include_router(products.router)
 app.include_router(dashboard.router)
 app.include_router(pricing.router)
 app.include_router(datasets.router)
 app.include_router(users.router)
-
-# API Routes - Future Modules (Backend APIs kept intact)
-# These routes exist but are hidden from UI until their milestone is enabled
 app.include_router(ai.router)
 app.include_router(reports.router)
 app.include_router(sales.router)

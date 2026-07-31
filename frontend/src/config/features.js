@@ -3,12 +3,9 @@
  * 
  * Controls which features are visible/accessible in the UI.
  * Backend APIs remain intact regardless of flag state.
- * 
- * Milestone 1: Core features (Dashboard, Products, Pricing, Datasets, Users, Settings)
- * Future Milestones: AI, Forecasting, Reports, Analytics, etc.
  */
 const FEATURES = {
-  // Milestone 1 - Active
+  // Core - Always active
   DASHBOARD: true,
   PRODUCTS: true,
   PRICING: true,
@@ -16,13 +13,15 @@ const FEATURES = {
   USERS: true,
   SETTINGS: true,
 
-  // Future Modules - Hidden until enabled
-  AI_PRICING: false,
+  // Enterprise modules - Active
+  AI_PRICING: true,
+  RECOMMENDATIONS: true,
+  REPORTS: true,
+  ANALYTICS: true,
+  REVENUE_INTELLIGENCE: true,
+
+  // Reserved for future milestones
   FORECASTING: false,
-  REPORTS: false,
-  ANALYTICS: false,
-  REVENUE_INTELLIGENCE: false,
-  RECOMMENDATIONS: false,
   ADVANCED_ANALYTICS: false,
   BUSINESS_INTELLIGENCE: false,
   PREDICTIVE_INSIGHTS: false,
@@ -56,13 +55,14 @@ export function getSidebarItems() {
     { label: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard', feature: 'DASHBOARD' },
     { label: 'Product Management', path: '/products', icon: 'Package', feature: 'PRODUCTS' },
     { label: 'Pricing Management', path: '/pricing', icon: 'DollarSign', feature: 'PRICING' },
+    { label: 'AI Price Prediction', path: '/ai', icon: 'BrainCircuit', feature: 'AI_PRICING' },
     { label: 'Dataset Management', path: '/datasets', icon: 'Database', feature: 'DATASETS' },
+    { label: 'Reports', path: '/reports', icon: 'BarChart3', feature: 'REPORTS' },
     { label: 'User Management', path: '/users', icon: 'Users', feature: 'USERS' },
     { label: 'Settings', path: '/settings', icon: 'Settings', feature: 'SETTINGS' },
   ];
 
-  // Future modules - hidden but preserved in code
-  return items.filter(item => FEATURES[item.feature]);
+  return items.filter((item) => FEATURES[item.feature]);
 }
 
 export default FEATURES;

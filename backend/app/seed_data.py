@@ -1,13 +1,19 @@
 """
 PricePilot AI - Seed Data Script
-Populates the database with realistic sample products for Milestone 1.
-Uses curated Unsplash photos that visually match each product.
+Populates the database with realistic sample products, sales history,
+a demo admin user, and activity logs.
 """
+
+from datetime import datetime, timedelta
+import random
 
 from sqlalchemy.orm import Session
 from app.models.product import Product
 from app.models.pricing_history import PricingHistory
 from app.models.activity_log import ActivityLog
+from app.models.sales import Sale
+from app.models.user import User
+from app.utils import hash_password
 
 SAMPLE_PRODUCTS = [
     {
@@ -206,13 +212,20 @@ SAMPLE_PRODUCTS = [
 
 
 def seed_database(db: Session):
-    """Seed the database with sample products if empty."""
+    """Seed the database with sample products, sales, demo users, and activity."""
     existing_count = db.query(Product).count()
     if existing_count > 0:
         print(f"Database already has {existing_count} products, skipping seed.")
+        _ensure_demo_admin(db)
         return
 
     print("Seeding database with sample products...")
+
+    # Ensure a demo admin exists first (needed for activity/user_id references)
+    _ensure_demo_admin(db)
+
+    admin = db.query(User).filter(User.username == "admin").first()
+    admin_id = admin.id if admin else None
 
     for i, product_data in enumerate(SAMPLE_PRODUCTS):
         product = Product(**product_data)
@@ -225,7 +238,7 @@ def seed_database(db: Session):
             old_price=product.base_price,
             new_price=product.current_price,
             change_reason="Initial pricing setup",
-            changed_by=None,
+            changed_by=admin_id,
         )
         db.add(history)
 
@@ -235,9 +248,72 @@ def seed_database(db: Session):
             resource_type="product",
             resource_id=product.id,
             details=f"Seeded with initial price ${product.current_price:.2f}",
-            user_id=None,
+            user_id=admin_id,
         )
         db.add(activity)
 
+        # Generate sales history (last 30 days) for revenue trend charts
+        _seed_sales(db, product, admin_id)
+
+    db.add(ActivityLog(
+        action="Demo dataset seeded",
+        resource_type="system",
+        details=f"Seeded {len(SAMPLE_PRODUCTS)} products with pricing history and sales data",
+        user_id=admin_id,
+    ))
+
     db.commit()
     print(f"Successfully seeded {len(SAMPLE_PRODUCTS)} products into the database!")
+
+
+def _ensure_demo_admin(db: Session):
+    """Create the demo admin user if it does not exist."""
+    admin = db.query(User).filter(User.username == "admin").first()
+    if admin:
+        return
+    admin = User(
+        username="admin",
+        email="admin@pricepilot.io",
+        full_name="System Admin",
+        hashed_password=hash_password("admin123"),
+        role="admin",
+        is_active=True,
+    )
+    db.add(admin)
+    db.flush()
+    db.add(ActivityLog(
+        action="Admin account created",
+        resource_type="user",
+        resource_id=admin.id,
+        details="Demo admin seeded with default credentials",
+        user_id=admin.id,
+    ))
+    print("Seeded demo admin user (admin / admin123)")
+
+
+def _seed_sales(db: Session, product: Product, user_id):
+    """Generate 30 days of realistic sales transactions for a product."""
+    random.seed(product.id)  # deterministic per product
+    base_units = max(1, int((product.stock_quantity or 10) / 20))
+    channels = ["Online", "Retail", "Marketplace", "Wholesale"]
+    regions = ["North", "South", "East", "West", "Central"]
+    segments = ["Consumer", "SMB", "Enterprise", "Government"]
+
+    for day_offset in range(30):
+        date = datetime.utcnow() - timedelta(days=day_offset)
+        # Weekend uplift
+        factor = 1.6 if date.weekday() >= 5 else 1.0
+        daily_units = max(1, int(base_units * factor * random.uniform(0.4, 1.4)))
+        for _ in range(daily_units):
+            qty = random.randint(1, 3)
+            unit_price = product.current_price * random.uniform(0.9, 1.1)
+            db.add(Sale(
+                product_id=product.id,
+                quantity=qty,
+                unit_price=round(unit_price, 2),
+                total_amount=round(unit_price * qty, 2),
+                sale_date=date.replace(hour=random.randint(8, 21), minute=random.randint(0, 59)),
+                sale_channel=random.choice(channels),
+                region=random.choice(regions),
+                customer_segment=random.choice(segments),
+            ))

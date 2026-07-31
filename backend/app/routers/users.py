@@ -2,9 +2,9 @@
 PricePilot AI - Users Router
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
@@ -22,7 +22,7 @@ def list_users(
     current_user: User = Depends(require_role(["admin"])),
 ):
     """List all users (admin only)."""
-    users = db.query(User).all()
+    users = db.query(User).order_by(User.created_at.desc()).all()
     return users
 
 
@@ -36,6 +36,38 @@ def create_user(
     auth_service = AuthService(db)
     user = auth_service.register(user_data)
     return user
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int,
+    body: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"])),
+):
+    """Update a user's role, name, email, or status (admin only)."""
+    auth_service = AuthService(db)
+    user = auth_service.update_user(
+        current_user,
+        user_id=user_id,
+        full_name=body.get("full_name"),
+        role=body.get("role"),
+        email=body.get("email"),
+        is_active=body.get("is_active"),
+    )
+    return user
+
+
+@router.post("/{user_id}/reset-password", response_model=MessageResponse)
+def reset_user_password(
+    user_id: int,
+    body: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"])),
+):
+    """Admin resets another user's password."""
+    auth_service = AuthService(db)
+    return auth_service.admin_reset_password(current_user, user_id, body["new_password"])
 
 
 @router.put("/{user_id}/status", response_model=MessageResponse)

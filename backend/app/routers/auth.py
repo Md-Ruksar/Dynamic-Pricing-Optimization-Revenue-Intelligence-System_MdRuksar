@@ -5,7 +5,9 @@ PricePilot AI - Auth Router
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import Dict
+import httpx
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
@@ -26,10 +28,17 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Dict)
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    """Authenticate and return JWT token."""
+    """Authenticate and return access + refresh tokens."""
     auth_service = AuthService(db)
     result = auth_service.login(credentials.username, credentials.password)
     return result
+
+
+@router.post("/refresh", response_model=Dict)
+def refresh_token(body: Dict = Body(...), db: Session = Depends(get_db)):
+    """Exchange a refresh token for a new access token."""
+    auth_service = AuthService(db)
+    return auth_service.refresh(body["refresh_token"])
 
 
 @router.get("/me", response_model=UserResponse)
@@ -38,12 +47,111 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+@router.put("/me", response_model=UserResponse)
+def update_me(
+    body: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update current user profile (name, email, notifications)."""
+    auth_service = AuthService(db)
+    user = auth_service.update_profile(
+        current_user,
+        full_name=body.get("full_name"),
+        email=body.get("email"),
+        notifications_enabled=body.get("notifications_enabled"),
+    )
+    return user
+
+
+@router.post("/change-password", response_model=Dict)
+def change_password(
+    body: Dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change the current user's password."""
+    auth_service = AuthService(db)
+    return auth_service.change_password(
+        current_user,
+        current_password=body["current_password"],
+        new_password=body["new_password"],
+    )
+
+
+@router.get("/google/authorize")
+def google_authorize():
+    """Redirect to Google OAuth consent screen."""
+    if not settings.GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+        )
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+    }
+    query = "&".join(f"{k}={v}" for k, v in params.items())
+    return {"authorization_url": f"https://accounts.google.com/o/oauth2/v2/auth?{query}"}
+
+
+@router.get("/google/callback")
+async def google_callback(
+    code: str,
+    db: Session = Depends(get_db),
+):
+    """Handle Google OAuth callback: exchange code, verify token, create/return JWT."""
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Google OAuth is not configured")
+
+    # Exchange authorization code for tokens
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                    "grant_type": "authorization_code",
+                },
+            )
+            token_resp.raise_for_status()
+            tokens = token_resp.json()
+
+            # Fetch user profile
+            profile_resp = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {tokens['access_token']}"},
+            )
+            profile_resp.raise_for_status()
+            profile = profile_resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Google authentication failed: {str(e)}")
+
+    email = profile.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Google account has no email")
+
+    auth_service = AuthService(db)
+    result = auth_service.google_login(
+        email=email,
+        google_id=profile.get("sub", ""),
+        name=profile.get("name") or profile.get("email", "").split("@")[0],
+    )
+    return result
+
+
 @router.post("/google-login", response_model=Dict)
 def google_login(
     body: Dict = Body(...),
     db: Session = Depends(get_db),
 ):
-    """Authenticate or register via Google OAuth.
+    """Authenticate or register via Google profile (used by frontend fallback flow).
     Accepts { "email": "...", "google_id": "...", "name": "..." }
     """
     auth_service = AuthService(db)

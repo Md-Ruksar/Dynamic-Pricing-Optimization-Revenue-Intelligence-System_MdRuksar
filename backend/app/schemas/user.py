@@ -49,6 +49,9 @@ class UserResponse(BaseModel):
     full_name: Optional[str] = None
     role: str
     is_active: bool
+    google_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    notifications_enabled: bool = True
     created_at: datetime
     
     class Config:
@@ -58,6 +61,7 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     """JWT token schema."""
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
 
 

@@ -67,6 +67,10 @@
     @apply btn bg-red-600 text-white hover:bg-red-700 shadow-sm;
   }
 
+  .btn-success {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm shadow-emerald-500/20;
+  }
+
   .btn-ghost {
     @apply btn text-surface-600 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800;
   }
@@ -166,6 +170,16 @@
   .empty-state {
     @apply flex flex-col items-center justify-center py-16 text-center;
   }
+}
+
+/* Forecast confidence-band cover: matches the card background so the band renders
+   between the lower/upper bounds instead of from zero. */
+.forecast-cover {
+  fill: #ffffff;
+}
+
+.dark .forecast-cover {
+  fill: #1e293b; /* surface-800 */
 }
 
 /* Scrollbar styling */

@@ -3,7 +3,7 @@ PricePilot AI - Configuration Settings
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -23,9 +23,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "pricepilot-ai-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
-    CORS_ORIGINS: list = [
+    CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
     ]
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 

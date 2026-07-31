@@ -4,9 +4,11 @@ PricePilot AI - Product Service
 
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from typing import Optional
+from typing import Optional, List
 
 from app.models.product import Product
+from app.models.pricing_history import PricingHistory
+from app.models.activity_log import ActivityLog
 from app.schemas.product import ProductCreate, ProductUpdate
 
 
@@ -35,8 +37,25 @@ class ProductService:
             description=data.description,
             stock_quantity=data.stock_quantity,
             revenue=data.revenue or 0.0,
+            image_url=data.image_url or "",
         )
         self.db.add(product)
+        self.db.flush()
+
+        self.db.add(PricingHistory(
+            product_id=product.id,
+            old_price=data.base_price,
+            new_price=data.current_price,
+            change_reason="Product created",
+            changed_by=user_id,
+        ))
+        self.db.add(ActivityLog(
+            action=f"Product '{product.name}' created",
+            resource_type="product",
+            resource_id=product.id,
+            details=f"SKU {product.sku}, price ${product.current_price:.2f}",
+            user_id=user_id,
+        ))
         self.db.commit()
         self.db.refresh(product)
         return product
@@ -53,12 +72,17 @@ class ProductService:
     
     def list_all(self, skip: int = 0, limit: int = 20,
                  category: Optional[str] = None,
-                 search: Optional[str] = None) -> tuple:
-        """List products with pagination, filtering, and search."""
+                 search: Optional[str] = None,
+                 status_filter: Optional[str] = None,
+                 sort_by: Optional[str] = None,
+                 sort_order: str = "desc") -> tuple:
+        """List products with pagination, filtering, search, and sorting."""
         query = self.db.query(Product)
         
         if category:
             query = query.filter(Product.category == category)
+        if status_filter:
+            query = query.filter(Product.status == status_filter)
         if search:
             search_pattern = f"%{search}%"
             query = query.filter(
@@ -66,16 +90,25 @@ class ProductService:
                 (Product.sku.ilike(search_pattern))
             )
         
+        # Sorting
+        sort_map = {
+            "name": Product.name,
+            "price": Product.current_price,
+            "stock": Product.stock_quantity,
+            "revenue": Product.revenue,
+            "created_at": Product.created_at,
+        }
+        sort_col = sort_map.get(sort_by, Product.created_at)
+        if sort_order == "asc":
+            query = query.order_by(sort_col.asc())
+        else:
+            query = query.order_by(sort_col.desc())
+        
         total = query.count()
-        products = (
-            query.order_by(Product.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        products = query.offset(skip).limit(limit).all()
         return total, products
     
-    def update(self, product_id: int, data: ProductUpdate) -> Product:
+    def update(self, product_id: int, data: ProductUpdate, user_id: Optional[int] = None) -> Product:
         """Update a product."""
         product = self.get_by_id(product_id)
         update_data = data.model_dump(exclude_unset=True)
@@ -95,9 +128,53 @@ class ProductService:
         for field, value in update_data.items():
             setattr(product, field, value)
         
+        self.db.add(ActivityLog(
+            action=f"Product '{product.name}' updated",
+            resource_type="product",
+            resource_id=product.id,
+            user_id=user_id,
+        ))
         self.db.commit()
         self.db.refresh(product)
         return product
+    
+    def set_status(self, product_id: int, new_status: str) -> Product:
+        """Set a product's status (active/inactive)."""
+        if new_status not in ("active", "inactive"):
+            raise HTTPException(status_code=400, detail="Status must be 'active' or 'inactive'")
+        product = self.get_by_id(product_id)
+        product.status = new_status
+        self.db.commit()
+        self.db.refresh(product)
+        return product
+    
+    def bulk_delete(self, ids: List[int]) -> int:
+        """Delete multiple products by IDs. Returns count deleted."""
+        if not ids:
+            raise HTTPException(status_code=400, detail="No product IDs provided")
+        deleted = 0
+        for pid in ids:
+            product = self.db.query(Product).filter(Product.id == pid).first()
+            if product:
+                self.db.delete(product)
+                deleted += 1
+        self.db.commit()
+        return deleted
+    
+    def bulk_set_status(self, ids: List[int], new_status: str) -> int:
+        """Set status for multiple products. Returns count updated."""
+        if new_status not in ("active", "inactive"):
+            raise HTTPException(status_code=400, detail="Status must be 'active' or 'inactive'")
+        if not ids:
+            raise HTTPException(status_code=400, detail="No product IDs provided")
+        updated = 0
+        for pid in ids:
+            product = self.db.query(Product).filter(Product.id == pid).first()
+            if product:
+                product.status = new_status
+                updated += 1
+        self.db.commit()
+        return updated
     
     def delete(self, product_id: int):
         """Delete a product."""

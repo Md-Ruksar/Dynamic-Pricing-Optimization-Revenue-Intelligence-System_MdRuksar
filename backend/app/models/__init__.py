@@ -8,6 +8,7 @@ from app.models.pricing_history import PricingHistory
 from app.models.sales import Sale
 from app.models.recommendation import Recommendation
 from app.models.activity_log import ActivityLog
+from app.models.forecast import ForecastRun
 
 __all__ = [
     "User",
@@ -16,4 +17,5 @@ __all__ = [
     "Sale",
     "Recommendation",
     "ActivityLog",
+    "ForecastRun",
 ]

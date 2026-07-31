@@ -55,7 +55,14 @@ export default function Login() {
     setSuccessMsg('');
     setGoogleLoading(true);
     try {
-      const googleEmail = prompt('Enter your Google email address to sign in:');
+      // Try the real OAuth flow first: get the Google authorization URL
+      const authRes = await authAPI.googleAuthorize();
+      if (authRes.data?.authorization_url) {
+        window.location.href = authRes.data.authorization_url;
+        return;
+      }
+      // Fallback: OAuth not configured — use the email-based demo flow
+      const googleEmail = prompt('Enter your Google email address to sign in (Google OAuth not configured):');
       if (!googleEmail || !googleEmail.includes('@')) {
         setGoogleLoading(false);
         return;
@@ -66,12 +73,35 @@ export default function Login() {
         google_id: `google_${googleEmail}`,
         name: name,
       });
-      const { access_token, user: userData } = response.data;
+      const { access_token, refresh_token, user: userData } = response.data;
       localStorage.setItem('access_token', access_token);
+      if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
       localStorage.setItem('user', JSON.stringify(userData));
       window.location.href = '/dashboard';
     } catch (err) {
-      setError(err.response?.data?.detail || 'Google sign in failed. Please try again.');
+      if (err.response?.status === 503) {
+        // OAuth not configured — use the email-based demo flow
+        const googleEmail = prompt('Enter your Google email address to sign in (Google OAuth not configured):');
+        if (googleEmail && googleEmail.includes('@')) {
+          try {
+            const name = googleEmail.split('@')[0];
+            const response = await authAPI.googleLogin({
+              email: googleEmail,
+              google_id: `google_${googleEmail}`,
+              name: name,
+            });
+            const { access_token, refresh_token, user: userData } = response.data;
+            localStorage.setItem('access_token', access_token);
+            if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
+            localStorage.setItem('user', JSON.stringify(userData));
+            window.location.href = '/dashboard';
+          } catch (e2) {
+            setError(e2.response?.data?.detail || 'Google sign in failed. Please try again.');
+          }
+        }
+      } else {
+        setError(err.response?.data?.detail || 'Google sign in failed. Please try again.');
+      }
     } finally {
       setGoogleLoading(false);
     }

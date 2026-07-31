@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
       setUser(response.data);
     } catch {
       localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
     } finally {
       setLoading(false);
@@ -28,13 +29,18 @@ export function AuthProvider({ children }) {
     fetchUser();
   }, [fetchUser]);
 
-  const login = async (credentials) => {
-    const response = await authAPI.login(credentials);
-    const { access_token, user: userData } = response.data;
+  const storeSession = (data) => {
+    const { access_token, refresh_token, user: userData } = data;
     localStorage.setItem('access_token', access_token);
+    if (refresh_token) localStorage.setItem('refresh_token', refresh_token);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     return userData;
+  };
+
+  const login = async (credentials) => {
+    const response = await authAPI.login(credentials);
+    return storeSession(response.data);
   };
 
   const register = async (userData) => {
@@ -42,14 +48,25 @@ export function AuthProvider({ children }) {
     return response.data;
   };
 
+  const googleLogin = async (data) => {
+    const response = await authAPI.googleLogin(data);
+    return storeSession(response.data);
+  };
+
+  const updateUser = (userData) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

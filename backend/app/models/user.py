@@ -20,6 +20,9 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="business_user")
     is_active = Column(Boolean, default=True)
+    google_id = Column(String(100), index=True)
+    avatar_url = Column(String(500))
+    notifications_enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, server_default=func.now())
     
     # Relationships

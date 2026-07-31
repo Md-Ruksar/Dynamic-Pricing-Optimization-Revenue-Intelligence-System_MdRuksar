@@ -4,11 +4,12 @@ import { getSidebarItems } from '../config/features';
 import {
   LayoutDashboard, Package, DollarSign, Database, Users,
   Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp,
-  Sparkles,
+  Sparkles, BrainCircuit, BarChart3,
 } from 'lucide-react';
 
 const iconMap = {
   LayoutDashboard, Package, DollarSign, Database, Users, Settings,
+  BrainCircuit, BarChart3,
 };
 
 export default function Sidebar({ collapsed, onToggle }) {

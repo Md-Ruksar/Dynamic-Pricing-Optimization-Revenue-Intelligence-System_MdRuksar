@@ -1,46 +1,84 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usersAPI } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import ConfirmDialog from '../components/ConfirmDialog';
 import {
   Users as UsersIcon, UserPlus, Shield, ShieldAlert, ShieldCheck,
   ToggleLeft, ToggleRight, Trash2, Loader2, X, AlertCircle,
-  RefreshCw, Mail, Calendar,
+  RefreshCw, Mail, Calendar, Edit2, KeyRound,
 } from 'lucide-react';
 
 export default function Users() {
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({ username: '', email: '', password: '', full_name: '', role: 'business_user' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [resetTarget, setResetTarget] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await usersAPI.list();
       setUsers(res.data);
     } catch (err) {
-      console.error('Failed to fetch users:', err);
+      toast.error('Failed to load users', err.response?.data?.detail);
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    setEditingUser(null);
+    setFormData({ username: '', email: '', password: '', full_name: '', role: 'business_user' });
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEdit = (u) => {
+    setEditingUser(u);
+    setFormData({
+      username: u.username,
+      email: u.email,
+      password: '',
+      full_name: u.full_name || '',
+      role: u.role,
+    });
+    setError('');
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     setError('');
     try {
-      await usersAPI.create(formData);
+      if (editingUser) {
+        await usersAPI.update(editingUser.id, {
+          full_name: formData.full_name,
+          role: formData.role,
+          email: formData.email,
+        });
+        toast.success('User updated', `${formData.full_name || formData.username} was updated`);
+      } else {
+        await usersAPI.create(formData);
+        toast.success('User created', `${formData.full_name || formData.username} added`);
+      }
       setModalOpen(false);
       fetchUsers();
     } catch (err) {
-      setError(err.response?.data?.detail?.[0]?.msg || err.response?.data?.detail || 'Failed to create user');
+      setError(err.response?.data?.detail?.[0]?.msg || err.response?.data?.detail || 'Failed to save user');
     } finally {
       setSaving(false);
     }
@@ -48,20 +86,42 @@ export default function Users() {
 
   const handleToggleStatus = async (userId) => {
     try {
-      await usersAPI.toggleStatus(userId);
+      const res = await usersAPI.toggleStatus(userId);
+      toast.success('Status updated', res.data.message);
       fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to toggle user status');
+      toast.error('Failed to toggle status', err.response?.data?.detail);
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await usersAPI.delete(userId);
+      await usersAPI.delete(deleteTarget);
+      toast.success('User deleted', 'The user was removed');
       fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to delete user');
+      toast.error('Delete failed', err.response?.data?.detail);
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetTarget || newPassword.length < 6) {
+      toast.error('Invalid password', 'Password must be at least 6 characters');
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await usersAPI.resetPassword(resetTarget, newPassword);
+      toast.success('Password reset', res.data.message);
+      setResetTarget(null);
+      setNewPassword('');
+    } catch (err) {
+      toast.error('Reset failed', err.response?.data?.detail);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -81,6 +141,8 @@ export default function Users() {
     }
   };
 
+  const resetTargetUser = users.find((u) => u.id === resetTarget);
+
   return (
     <div className="page-transition space-y-6">
       {/* Header */}
@@ -93,7 +155,7 @@ export default function Users() {
           <button onClick={fetchUsers} className="btn-secondary btn-sm">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => { setError(''); setFormData({ username: '', email: '', password: '', full_name: '', role: 'business_user' }); setModalOpen(true); }} className="btn-primary btn-sm">
+          <button onClick={openCreate} className="btn-primary btn-sm">
             <UserPlus className="w-4 h-4" />
             Add User
           </button>
@@ -152,9 +214,14 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="table-cell">
-                      <span className={`badge ${u.is_active ? 'badge-success' : 'badge-danger'}`}>
+                      <button
+                        onClick={() => handleToggleStatus(u.id)}
+                        disabled={u.id === currentUser?.id}
+                        className={`badge cursor-pointer transition-all hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60 ${u.is_active ? 'badge-success' : 'badge-danger'}`}
+                        title={u.id === currentUser?.id ? 'Cannot change your own status' : 'Click to toggle'}
+                      >
                         {u.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      </button>
                     </td>
                     <td className="table-cell text-xs text-surface-400">
                       <div className="flex items-center gap-1">
@@ -163,27 +230,39 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="table-cell text-right">
-                      {u.id !== currentUser?.id && (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleToggleStatus(u.id)}
-                            className="btn-ghost btn-sm p-1.5"
-                            title={u.is_active ? 'Deactivate user' : 'Activate user'}
-                          >
-                            {u.is_active
-                              ? <ToggleRight className="w-4 h-4 text-emerald-500" />
-                              : <ToggleLeft className="w-4 h-4 text-surface-400" />
-                            }
+                      <div className="flex items-center justify-end gap-1.5">
+                        {u.id !== currentUser?.id && (
+                          <>
+                            <button onClick={() => openEdit(u)} className="btn-ghost btn-sm p-1.5" title="Edit user">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => { setResetTarget(u.id); setNewPassword(''); }} className="btn-ghost btn-sm p-1.5" title="Reset password">
+                              <KeyRound className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleToggleStatus(u.id)}
+                              className="btn-ghost btn-sm p-1.5"
+                              title={u.is_active ? 'Deactivate user' : 'Activate user'}
+                            >
+                              {u.is_active
+                                ? <ToggleRight className="w-4 h-4 text-emerald-500" />
+                                : <ToggleLeft className="w-4 h-4 text-surface-400" />}
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(u.id)}
+                              className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Delete user"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {u.id === currentUser?.id && (
+                          <button onClick={() => openEdit(u)} className="btn-ghost btn-sm p-1.5" title="Edit yourself">
+                            <Edit2 className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDelete(u.id)}
-                            className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            title="Delete user"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -193,12 +272,14 @@ export default function Users() {
         </div>
       </div>
 
-      {/* Create User Modal */}
+      {/* Create/Edit User Modal */}
       {modalOpen && (
         <div className="modal-overlay" onClick={() => setModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="card-header flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-surface-900 dark:text-white">Create User</h2>
+              <h2 className="text-lg font-semibold text-surface-900 dark:text-white">
+                {editingUser ? 'Edit User' : 'Create User'}
+              </h2>
               <button onClick={() => setModalOpen(false)} className="btn-ghost p-1">
                 <X className="w-5 h-5" />
               </button>
@@ -214,17 +295,21 @@ export default function Users() {
                 <label className="label">Full Name</label>
                 <input className="input" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
               </div>
-              <div>
-                <label className="label">Username *</label>
-                <input className="input" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required />
-              </div>
+              {!editingUser && (
+                <>
+                  <div>
+                    <label className="label">Username *</label>
+                    <input className="input" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} required />
+                  </div>
+                  <div>
+                    <label className="label">Password *</label>
+                    <input type="password" className="input" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="label">Email *</label>
                 <input type="email" className="input" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
-              </div>
-              <div>
-                <label className="label">Password *</label>
-                <input type="password" className="input" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required />
               </div>
               <div>
                 <label className="label">Role</label>
@@ -236,9 +321,62 @@ export default function Users() {
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button>
-                <button onClick={handleCreate} disabled={saving || !formData.username || !formData.email || !formData.password} className="btn-primary">
+                <button
+                  onClick={handleSave}
+                  disabled={saving || (!editingUser && (!formData.username || !formData.email || !formData.password))}
+                  className="btn-primary"
+                >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Create User
+                  {editingUser ? 'Save Changes' : 'Create User'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete user?"
+        message="This user will lose access to the platform immediately. This action cannot be undone."
+        confirmLabel="Delete User"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* Reset password modal */}
+      {resetTarget !== null && (
+        <div className="modal-overlay" onClick={() => setResetTarget(null)}>
+          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="card-header flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-surface-900 dark:text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-primary-500" />
+                Reset Password
+              </h2>
+              <button onClick={() => setResetTarget(null)} className="btn-ghost p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-surface-500 dark:text-surface-400">
+                Set a new password for <span className="font-semibold text-surface-900 dark:text-white">{resetTargetUser?.full_name || resetTargetUser?.username}</span>
+              </p>
+              <div>
+                <label className="label">New Password</label>
+                <input
+                  type="password"
+                  className="input"
+                  placeholder="Min. 6 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button onClick={() => setResetTarget(null)} className="btn-secondary">Cancel</button>
+                <button onClick={handleResetPassword} disabled={resetting || newPassword.length < 6} className="btn-primary">
+                  {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                  Reset Password
                 </button>
               </div>
             </div>

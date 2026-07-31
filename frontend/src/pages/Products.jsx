@@ -1,21 +1,24 @@
-import { useState, useEffect } from 'react';
-import { productsAPI } from '../api/client';
+import { useState, useEffect, useCallback } from 'react';
+import { productsAPI, datasetsAPI, downloadBlob } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import ConfirmDialog from '../components/ConfirmDialog';
 import {
   Package, Plus, Search, Edit2, Trash2, ChevronLeft, ChevronRight,
-  Loader2, X, AlertCircle, Filter, RefreshCw, Grid3X3, List,
-  ImageOff, ShoppingBag, Tag, Layers, TrendingUp,
+  Loader2, X, AlertCircle, RefreshCw, ImageOff, Tag, TrendingUp,
+  Download, Upload, CheckSquare, Square, ArrowUpDown, Power,
 } from 'lucide-react';
 
 const PLACEHOLDER_IMG = 'data:image/svg+xml,' + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-    <rect fill="#f1f5f9" width="400" height="400"/>
-    <text x="200" y="200" text-anchor="middle" dominant-baseline="central" fill="#94a3b8" font-family="system-ui" font-size="16">No Image</text>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+    <rect fill="#e2e8f0" width="80" height="80"/>
+    <text x="40" y="42" text-anchor="middle" dominant-baseline="central" fill="#94a3b8" font-family="system-ui" font-size="10">No Image</text>
   </svg>`
 );
 
 export default function Products() {
   const { user } = useAuth();
+  const toast = useToast();
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -23,8 +26,11 @@ export default function Products() {
   const [category, setCategory] = useState('');
   const [categories, setCategories] = useState([]);
   const [page, setPage] = useState(0);
-  const [limit, setLimit] = useState(12);
-  const [viewMode, setViewMode] = useState('grid');
+  const [limit, setLimit] = useState(20);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [selected, setSelected] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('');
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,41 +41,51 @@ export default function Products() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [bulkConfirm, setBulkConfirm] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const isAdminOrPricing = user?.role === 'admin' || user?.role === 'pricing_manager';
+  const isAdmin = user?.role === 'admin';
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { skip: page * limit, limit };
+      const params = { skip: page * limit, limit, sort_by: sortBy, sort_order: sortOrder };
       if (search) params.search = search;
       if (category) params.category = category;
+      if (statusFilter) params.status = statusFilter;
       const res = await productsAPI.list(params);
       setProducts(res.data.items);
       setTotal(res.data.total);
+      setSelected([]);
     } catch (err) {
-      console.error('Failed to fetch products:', err);
+      toast.error('Failed to load products', err.response?.data?.detail);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, category, limit, search, sortBy, sortOrder, statusFilter, toast]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const res = await productsAPI.getCategories();
       setCategories(res.data);
     } catch { /* ignore */ }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, [page, category, limit]);
+  }, [fetchProducts, fetchCategories]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(0);
-    fetchProducts();
+  const toggleSort = (col) => {
+    if (sortBy === col) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(col);
+      setSortOrder('desc');
+    }
   };
 
   const openCreate = () => {
@@ -105,8 +121,10 @@ export default function Products() {
     try {
       if (editingProduct) {
         await productsAPI.update(editingProduct.id, formData);
+        toast.success('Product updated', `${formData.name} was saved successfully`);
       } else {
         await productsAPI.create(formData);
+        toast.success('Product created', `${formData.name} added to the catalog`);
       }
       setModalOpen(false);
       fetchProducts();
@@ -117,21 +135,102 @@ export default function Products() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    const id = deleteConfirm;
+    setDeleteConfirm(null);
     try {
       await productsAPI.delete(id);
+      toast.success('Product deleted', 'The product was removed from the catalog');
       fetchProducts();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to delete product');
+      toast.error('Delete failed', err.response?.data?.detail);
     }
   };
 
-  const handleImageError = (e) => {
-    e.target.src = PLACEHOLDER_IMG;
+  const handleBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    setBulkConfirm(null);
+    try {
+      const res = await productsAPI.bulkDelete(selected);
+      toast.success('Products deleted', res.data.message);
+      fetchProducts();
+    } catch (err) {
+      toast.error('Bulk delete failed', err.response?.data?.detail);
+    }
+  };
+
+  const handleToggleStatus = async (product) => {
+    const newStatus = product.status === 'active' ? 'inactive' : 'active';
+    try {
+      await productsAPI.toggleStatus(product.id, newStatus);
+      toast.success('Status updated', `${product.name} is now ${newStatus}`);
+      fetchProducts();
+    } catch (err) {
+      toast.error('Failed to update status', err.response?.data?.detail);
+    }
+  };
+
+  const handleBulkStatus = async (status) => {
+    try {
+      const res = await productsAPI.bulkStatus(selected, status);
+      toast.success('Bulk update', res.data.message);
+      fetchProducts();
+    } catch (err) {
+      toast.error('Bulk update failed', err.response?.data?.detail);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await productsAPI.exportCsv({ category: category || undefined, search: search || undefined });
+      downloadBlob(res, 'products.csv');
+      toast.success('Export complete', 'Products exported as CSV');
+    } catch (err) {
+      toast.error('Export failed', 'Could not generate CSV');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const res = await datasetsAPI.upload(file, 'retail-pricing');
+      toast.success('File processed', res.data.message || 'Dataset processed');
+      fetchProducts();
+    } catch (err) {
+      toast.error('Import failed', err.response?.data?.detail || 'Could not process file');
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.length === products.length) setSelected([]);
+    else setSelected(products.map((p) => p.id));
   };
 
   const totalPages = Math.ceil(total / limit);
+  const SortableHeader = ({ col, children, className = '' }) => (
+    <th
+      className={`table-header cursor-pointer select-none hover:text-surface-900 dark:hover:text-white transition-colors ${className}`}
+      onClick={() => toggleSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {children}
+        <ArrowUpDown className={`w-3 h-3 ${sortBy === col ? 'text-primary-500' : 'text-surface-300 dark:text-surface-600'}`} />
+      </span>
+    </th>
+  );
 
   return (
     <div className="page-transition space-y-6">
@@ -143,39 +242,23 @@ export default function Products() {
             <span className="font-medium text-surface-700 dark:text-surface-300">{total}</span> products in your catalog
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-surface-700 shadow-sm text-primary-600 dark:text-primary-400'
-                  : 'text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
-              }`}
-              title="Grid view"
-            >
-              <Grid3X3 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-white dark:bg-surface-700 shadow-sm text-primary-600 dark:text-primary-400'
-                  : 'text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
-              }`}
-              title="List view"
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
-          <button onClick={() => { setPage(0); fetchProducts(); }} className="btn-secondary btn-sm">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={handleExport} disabled={exporting || products.length === 0} className="btn-secondary btn-sm">
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Export CSV
           </button>
           {isAdminOrPricing && (
-            <button onClick={openCreate} className="btn-primary btn-sm">
-              <Plus className="w-4 h-4" />
-              Add Product
-            </button>
+            <>
+              <label className="btn-outline btn-sm cursor-pointer">
+                {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Import CSV
+                <input type="file" accept=".csv,.xlsx" className="hidden" onChange={handleImport} />
+              </label>
+              <button onClick={openCreate} className="btn-primary btn-sm">
+                <Plus className="w-4 h-4" />
+                Add Product
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -183,15 +266,15 @@ export default function Products() {
       {/* Filters */}
       <div className="card">
         <div className="card-body">
-          <form onSubmit={handleSearch} className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px] relative">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex-1 min-w-[220px] relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
               <input
                 type="text"
                 className="input pl-9"
                 placeholder="Search by name or SKU..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               />
             </div>
             <select
@@ -200,45 +283,79 @@ export default function Products() {
               onChange={(e) => { setCategory(e.target.value); setPage(0); }}
             >
               <option value="">All Categories</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select
+              className="input w-auto min-w-[130px]"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
             <select
               className="input w-auto min-w-[120px]"
               value={limit}
               onChange={(e) => { setLimit(Number(e.target.value)); setPage(0); }}
             >
-              <option value={12}>12 per page</option>
-              <option value={24}>24 per page</option>
-              <option value={48}>48 per page</option>
+              <option value={20}>20 per page</option>
+              <option value={50}>50 per page</option>
+              <option value={100}>100 per page</option>
             </select>
-            <button type="submit" className="btn-primary">Search</button>
-            {(search || category) && (
-              <button type="button" onClick={() => { setSearch(''); setCategory(''); setPage(0); }} className="btn-ghost">
+            <button onClick={() => { setPage(0); fetchProducts(); }} className="btn-primary">
+              Apply
+            </button>
+            {(search || category || statusFilter) && (
+              <button onClick={() => { setSearch(''); setCategory(''); setStatusFilter(''); setPage(0); }} className="btn-ghost">
                 <X className="w-4 h-4" /> Clear
               </button>
             )}
-          </form>
+          </div>
+
+          {/* Bulk actions */}
+          {selected.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 animate-fade-in">
+              <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                {selected.length} selected
+              </span>
+              {isAdminOrPricing && (
+                <>
+                  <button onClick={() => handleBulkStatus('active')} className="btn-secondary btn-sm">
+                    <Power className="w-3.5 h-3.5" /> Activate
+                  </button>
+                  <button onClick={() => handleBulkStatus('inactive')} className="btn-secondary btn-sm">
+                    <Power className="w-3.5 h-3.5" /> Deactivate
+                  </button>
+                  {isAdmin && (
+                    <button onClick={() => setBulkConfirm(true)} className="btn-danger btn-sm">
+                      <Trash2 className="w-3.5 h-3.5" /> Delete Selected
+                    </button>
+                  )}
+                </>
+              )}
+              <button onClick={() => setSelected([])} className="btn-ghost btn-sm ml-auto">
+                <X className="w-3.5 h-3.5" /> Clear
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Loading State */}
+      {/* Loading / Empty / Table */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="card overflow-hidden animate-pulse">
-              <div className="aspect-square bg-surface-200 dark:bg-surface-700" />
-              <div className="p-4 space-y-3">
-                <div className="h-4 bg-surface-200 dark:bg-surface-700 rounded w-3/4" />
-                <div className="h-3 bg-surface-200 dark:bg-surface-700 rounded w-1/2" />
-                <div className="h-5 bg-surface-200 dark:bg-surface-700 rounded w-1/3" />
+        <div className="card overflow-hidden">
+          <div className="divide-y divide-surface-200 dark:divide-surface-700">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4">
+                <div className="skeleton w-10 h-10 rounded-lg"></div>
+                <div className="skeleton h-4 w-48"></div>
+                <div className="skeleton h-4 w-20 ml-auto"></div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : products.length === 0 ? (
-        /* Empty State */
         <div className="card">
           <div className="card-body text-center py-16">
             <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-surface-100 dark:bg-surface-800 flex items-center justify-center">
@@ -246,214 +363,128 @@ export default function Products() {
             </div>
             <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-1">No products found</h3>
             <p className="text-sm text-surface-500 dark:text-surface-400 max-w-sm mx-auto">
-              {search || category
+              {search || category || statusFilter
                 ? 'Try adjusting your search or filter criteria.'
-                : 'Get started by adding your first product to the catalog.'}
+                : 'Get started by adding your first product or importing a CSV.'}
             </p>
-            {isAdminOrPricing && !search && !category && (
+            {isAdminOrPricing && !search && !category && !statusFilter && (
               <button onClick={openCreate} className="btn-primary btn-sm mt-6">
                 <Plus className="w-4 h-4" /> Add your first product
               </button>
             )}
           </div>
         </div>
-      ) : viewMode === 'grid' ? (
-        /* Grid View */
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="card overflow-hidden group hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-              >
-                {/* Product Image */}
-                <div className="relative aspect-square bg-surface-100 dark:bg-surface-800 overflow-hidden">
-                  <img
-                    src={product.image_url || PLACEHOLDER_IMG}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={handleImageError}
-                    loading="lazy"
-                  />
-                  {/* Status Badge */}
-                  <div className="absolute top-3 left-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${
-                      product.status === 'active'
-                        ? 'bg-emerald-500/90 text-white'
-                        : 'bg-surface-500/90 text-white'
-                    }`}>
-                      {product.status}
-                    </span>
-                  </div>
-                  {/* Stock Badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm ${
-                      product.stock_quantity > 10
-                        ? 'bg-blue-500/90 text-white'
-                        : product.stock_quantity > 0
-                        ? 'bg-amber-500/90 text-white'
-                        : 'bg-red-500/90 text-white'
-                    }`}>
-                      {product.stock_quantity} in stock
-                    </span>
-                  </div>
-                  {/* Action buttons on hover */}
-                  {isAdminOrPricing && (
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
-                      <button
-                        onClick={() => openEdit(product)}
-                        className="p-2.5 bg-white/90 backdrop-blur-sm rounded-full text-surface-700 hover:bg-white transition-colors shadow-lg"
-                        title="Edit product"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {user?.role === 'admin' && (
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          className="p-2.5 bg-white/90 backdrop-blur-sm rounded-full text-red-500 hover:bg-white transition-colors shadow-lg"
-                          title="Delete product"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Product Info */}
-                <div className="p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold text-surface-900 dark:text-white truncate" title={product.name}>
-                        {product.name}
-                      </h3>
-                      <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-                        {product.sku}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Category */}
-                  <div className="flex items-center gap-1.5">
-                    <Tag className="w-3 h-3 text-surface-400" />
-                    <span className="text-xs text-surface-500 dark:text-surface-400">
-                      {product.category || 'Uncategorized'}
-                    </span>
-                  </div>
-
-                  {/* Price & Margin Row */}
-                  <div className="flex items-end justify-between pt-1">
-                    <div>
-                      <p className="text-lg font-bold text-surface-900 dark:text-white font-mono">
-                        ${product.current_price?.toFixed(2)}
-                      </p>
-                      {product.base_price !== product.current_price && (
-                        <p className="text-xs text-surface-400 line-through font-mono">
-                          ${product.base_price?.toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                    {product.cost_price && (
-                      <div className="text-right">
-                        <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                          +{((product.current_price - product.cost_price) / product.cost_price * 100).toFixed(0)}%
-                        </div>
-                        <div className="text-[10px] text-surface-400">margin</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Revenue bar */}
-                  {product.revenue > 0 && (
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between text-[10px] text-surface-400 mb-1">
-                        <span>Revenue</span>
-                        <span>${product.revenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="w-full bg-surface-200 dark:bg-surface-700 rounded-full h-1">
-                        <div
-                          className="bg-primary-500 h-1 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, (product.revenue / 30000) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
       ) : (
-        /* List View */
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-surface-50 dark:bg-surface-800/50">
-                  <th className="table-header">Product</th>
+                  <th className="table-header w-10">
+                    <button onClick={toggleSelectAll} className="text-surface-500 hover:text-primary-600 transition-colors">
+                      {selected.length === products.length
+                        ? <CheckSquare className="w-4 h-4 text-primary-500" />
+                        : <Square className="w-4 h-4" />}
+                    </button>
+                  </th>
+                  <SortableHeader col="name">Product</SortableHeader>
                   <th className="table-header">SKU</th>
                   <th className="table-header">Category</th>
-                  <th className="table-header">Price</th>
-                  <th className="table-header">Stock</th>
+                  <SortableHeader col="price">Price</SortableHeader>
+                  <th className="table-header">Cost</th>
+                  <th className="table-header">Margin</th>
+                  <SortableHeader col="stock">Stock</SortableHeader>
+                  <SortableHeader col="revenue">Revenue</SortableHeader>
                   <th className="table-header">Status</th>
                   {isAdminOrPricing && <th className="table-header text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-200 dark:divide-surface-700">
-                {products.map((product) => (
-                  <tr key={product.id} className="table-row">
-                    <td className="table-cell">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-800 overflow-hidden flex-shrink-0">
-                          <img
-                            src={product.image_url || PLACEHOLDER_IMG}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                            onError={handleImageError}
-                            loading="lazy"
-                          />
-                        </div>
-                        <span className="font-medium truncate max-w-[200px]">{product.name}</span>
-                      </div>
-                    </td>
-                    <td className="table-cell text-surface-500 font-mono text-xs">{product.sku}</td>
-                    <td className="table-cell">
-                      <span className="badge-neutral">{product.category || 'Uncategorized'}</span>
-                    </td>
-                    <td className="table-cell font-mono font-medium">${product.current_price?.toFixed(2)}</td>
-                    <td className="table-cell">
-                      <span className={`badge ${
-                        product.stock_quantity > 10 ? 'badge-success'
-                        : product.stock_quantity > 0 ? 'badge-warning'
-                        : 'badge-danger'
-                      }`}>
-                        {product.stock_quantity || 0}
-                      </span>
-                    </td>
-                    <td className="table-cell">
-                      <span className={`badge ${product.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
-                        {product.status}
-                      </span>
-                    </td>
-                    {isAdminOrPricing && (
-                      <td className="table-cell text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => openEdit(product)} className="btn-ghost btn-sm p-1.5">
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          {user?.role === 'admin' && (
-                            <button
-                              onClick={() => handleDelete(product.id)}
-                              className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                {products.map((product) => {
+                  const margin = product.cost_price
+                    ? ((product.current_price - product.cost_price) / product.current_price * 100).toFixed(1)
+                    : null;
+                  return (
+                    <tr key={product.id} className="table-row">
+                      <td className="table-cell">
+                        <button onClick={() => toggleSelect(product.id)} className="text-surface-500 hover:text-primary-600 transition-colors">
+                          {selected.includes(product.id)
+                            ? <CheckSquare className="w-4 h-4 text-primary-500" />
+                            : <Square className="w-4 h-4" />}
+                        </button>
+                      </td>
+                      <td className="table-cell">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-surface-100 dark:bg-surface-800 overflow-hidden flex-shrink-0">
+                            <img
+                              src={product.image_url || PLACEHOLDER_IMG}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.src = PLACEHOLDER_IMG; }}
+                              loading="lazy"
+                            />
+                          </div>
+                          <span className="font-medium text-surface-900 dark:text-white truncate max-w-[220px]">{product.name}</span>
                         </div>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="table-cell text-surface-500 font-mono text-xs">{product.sku}</td>
+                      <td className="table-cell">
+                        <span className="badge-neutral flex items-center gap-1 w-fit">
+                          <Tag className="w-3 h-3" /> {product.category || 'Uncategorized'}
+                        </span>
+                      </td>
+                      <td className="table-cell font-mono font-semibold text-surface-900 dark:text-white">${product.current_price?.toFixed(2)}</td>
+                      <td className="table-cell font-mono text-surface-500">${product.cost_price?.toFixed(2) ?? '—'}</td>
+                      <td className="table-cell">
+                        {margin !== null ? (
+                          <span className={`badge ${margin >= 40 ? 'badge-success' : margin >= 20 ? 'badge-warning' : 'badge-danger'}`}>
+                            {margin}%
+                          </span>
+                        ) : <span className="text-surface-400">—</span>}
+                      </td>
+                      <td className="table-cell">
+                        <span className={`badge ${
+                          product.stock_quantity > 10 ? 'badge-success'
+                          : product.stock_quantity > 0 ? 'badge-warning'
+                          : 'badge-danger'
+                        }`}>
+                          {product.stock_quantity || 0}
+                        </span>
+                      </td>
+                      <td className="table-cell font-mono text-xs">${(product.revenue || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                      <td className="table-cell">
+                        <button
+                          onClick={() => handleToggleStatus(product)}
+                          className={`badge cursor-pointer transition-all hover:opacity-80 ${
+                            product.status === 'active' ? 'badge-success' : 'badge-neutral'
+                          }`}
+                          title={isAdminOrPricing ? 'Click to toggle status' : product.status}
+                        >
+                          <Power className="w-3 h-3 mr-1" />
+                          {product.status}
+                        </button>
+                      </td>
+                      {isAdminOrPricing && (
+                        <td className="table-cell text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button onClick={() => openEdit(product)} className="btn-ghost btn-sm p-1.5" title="Edit product">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => setDeleteConfirm(product.id)}
+                                className="btn-ghost btn-sm p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                title="Delete product"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -468,11 +499,7 @@ export default function Products() {
               Showing {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
             </p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(Math.max(0, page - 1))}
-                disabled={page === 0}
-                className="btn-secondary btn-sm disabled:opacity-40"
-              >
+              <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="btn-secondary btn-sm disabled:opacity-40">
                 <ChevronLeft className="w-4 h-4" />
               </button>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -482,9 +509,7 @@ export default function Products() {
                   <button
                     key={pageNum}
                     onClick={() => setPage(pageNum)}
-                    className={`btn-sm min-w-[36px] ${
-                      pageNum === page ? 'btn-primary' : 'btn-secondary'
-                    }`}
+                    className={`btn-sm min-w-[36px] ${pageNum === page ? 'btn-primary' : 'btn-secondary'}`}
                   >
                     {pageNum + 1}
                   </button>
@@ -522,133 +547,50 @@ export default function Products() {
                 </div>
               )}
 
-              {formData.image_url && (
-                <div className="flex justify-center">
-                  <div className="w-32 h-32 rounded-xl overflow-hidden border-2 border-surface-200 dark:border-surface-600">
-                    <img
-                      src={formData.image_url}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                  </div>
-                </div>
-              )}
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="label">Product Name</label>
-                  <input
-                    className="input"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    placeholder="e.g. Wireless Bluetooth Headphones"
-                  />
+                  <input className="input" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g. Wireless Bluetooth Headphones" />
                 </div>
                 <div>
                   <label className="label">SKU</label>
-                  <input
-                    className="input"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    required
-                    placeholder="e.g. ELEC-001"
-                  />
+                  <input className="input" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} required placeholder="e.g. ELEC-001" />
                 </div>
                 <div>
                   <label className="label">Category</label>
-                  <input
-                    className="input"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="e.g. Electronics"
-                    list="category-suggestions"
-                  />
+                  <input className="input" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} placeholder="e.g. Electronics" list="category-suggestions" />
                   <datalist id="category-suggestions">
-                    {categories.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                    <option value="Electronics" />
-                    <option value="Clothing" />
-                    <option value="Home & Kitchen" />
-                    <option value="Sports & Outdoors" />
-                    <option value="Accessories" />
-                    <option value="Furniture" />
+                    {categories.map((c) => <option key={c} value={c} />)}
                   </datalist>
                 </div>
                 <div>
                   <label className="label">Base Price ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input"
-                    value={formData.base_price}
-                    onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
+                  <input type="number" step="0.01" min="0" className="input" value={formData.base_price} onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) || 0 })} required />
                 </div>
                 <div>
                   <label className="label">Current Price ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input"
-                    value={formData.current_price}
-                    onChange={(e) => setFormData({ ...formData, current_price: parseFloat(e.target.value) || 0 })}
-                    required
-                  />
+                  <input type="number" step="0.01" min="0" className="input" value={formData.current_price} onChange={(e) => setFormData({ ...formData, current_price: parseFloat(e.target.value) || 0 })} required />
                 </div>
                 <div>
                   <label className="label">Cost Price ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="input"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })}
-                  />
+                  <input type="number" step="0.01" min="0" className="input" value={formData.cost_price} onChange={(e) => setFormData({ ...formData, cost_price: parseFloat(e.target.value) || 0 })} />
                 </div>
                 <div>
                   <label className="label">Stock Quantity</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="input"
-                    value={formData.stock_quantity}
-                    onChange={(e) => setFormData({ ...formData, stock_quantity: parseInt(e.target.value) || 0 })}
-                  />
+                  <input type="number" min="0" className="input" value={formData.stock_quantity} onChange={(e) => setFormData({ ...formData, stock_quantity: parseInt(e.target.value) || 0 })} />
                 </div>
                 <div className="col-span-2">
                   <label className="label">Image URL</label>
-                  <input
-                    className="input"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="https://picsum.photos/seed/myproduct/400/400"
-                  />
+                  <input className="input" value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} placeholder="https://example.com/image.jpg" />
                 </div>
                 <div className="col-span-2">
                   <label className="label">Description</label>
-                  <textarea
-                    className="input"
-                    rows="3"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe your product..."
-                  />
+                  <textarea className="input" rows="3" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe your product..." />
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !formData.name || !formData.sku}
-                  className="btn-primary"
-                >
+                <button onClick={handleSave} disabled={saving || !formData.name || !formData.sku} className="btn-primary">
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   {editingProduct ? 'Save Changes' : 'Create Product'}
                 </button>
@@ -657,6 +599,26 @@ export default function Products() {
           </div>
         </div>
       )}
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        title="Delete product?"
+        message="This will permanently remove the product and its pricing history. This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+
+      {/* Bulk delete confirm */}
+      <ConfirmDialog
+        open={bulkConfirm !== null}
+        title={`Delete ${selected.length} products?`}
+        message="All selected products will be permanently removed from the catalog."
+        confirmLabel="Delete Selected"
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
+      />
     </div>
   );
 }

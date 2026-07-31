@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -9,7 +10,9 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Pricing from './pages/Pricing';
+import AIPrediction from './pages/AIPrediction';
 import Datasets from './pages/Datasets';
+import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 
@@ -78,7 +81,9 @@ function AppRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/products" element={<Products />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/ai" element={<AIPrediction />} />
         <Route path="/datasets" element={<Datasets />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<AdminRoute><Users /></AdminRoute>} />
         <Route path="/settings" element={<Settings />} />
       </Route>
@@ -94,7 +99,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppRoutes />
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
       </AuthProvider>
     </ThemeProvider>
   );

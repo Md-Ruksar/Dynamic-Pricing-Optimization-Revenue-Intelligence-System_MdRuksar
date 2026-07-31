@@ -1,37 +1,92 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Moon, Sun, User, Lock, Settings as SettingsIcon, 
-  Save, Loader2, Mail, Shield, CheckCircle2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { authAPI } from '../api/client';
+import {
+  Moon, Sun, User, Lock, Settings as SettingsIcon,
+  Save, Loader2, Mail, Shield, CheckCircle2, Bell, Eye, EyeOff, Database, Cpu,
+} from 'lucide-react';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState('profile');
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState('');
+
+  // Profile form
+  const [profile, setProfile] = useState({ full_name: '', email: '', notifications_enabled: true });
+
+  // Password form
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '', new_password: '', confirm_password: '',
+  });
+  const [showPw, setShowPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        full_name: user.full_name || '',
+        email: user.email || '',
+        notifications_enabled: user.notifications_enabled ?? true,
+      });
+    }
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    if (!profile.email?.includes('@')) {
+      toast.error('Invalid email', 'Please enter a valid email address');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await authAPI.updateMe({
+        full_name: profile.full_name,
+        email: profile.email,
+        notifications_enabled: profile.notifications_enabled,
+      });
+      updateUser(res.data);
+      toast.success('Profile updated', 'Your profile changes were saved');
+    } catch (err) {
+      toast.error('Update failed', err.response?.data?.detail || 'Could not save profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSavePassword = async () => {
+    if (passwordForm.new_password.length < 6) {
+      toast.error('Invalid password', 'New password must be at least 6 characters');
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error('Passwords do not match', 'Please re-enter your new password');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await authAPI.changePassword({
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+      toast.success('Password changed', res.data.message);
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err) {
+      toast.error('Password change failed', err.response?.data?.detail || 'Could not change password');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'password', label: 'Password', icon: Lock },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'system', label: 'System', icon: SettingsIcon },
   ];
-
-  const handleSaveProfile = async () => {
-    setSaving(true);
-    setSuccess('');
-    await new Promise((r) => setTimeout(r, 1000));
-    setSuccess('Profile updated successfully');
-    setSaving(false);
-  };
-
-  const handleSavePassword = async () => {
-    setSaving(true);
-    setSuccess('');
-    await new Promise((r) => setTimeout(r, 1000));
-    setSuccess('Password changed successfully');
-    setSaving(false);
-  };
 
   return (
     <div className="page-transition space-y-6">
@@ -70,13 +125,6 @@ export default function Settings() {
         {/* Content */}
         <div className="flex-1">
           <div className="card">
-            {success && (
-              <div className="mx-6 mt-6 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-sm text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                {success}
-              </div>
-            )}
-
             {/* Profile Tab */}
             {activeTab === 'profile' && (
               <div className="card-body space-y-5">
@@ -87,21 +135,32 @@ export default function Settings() {
                   <div>
                     <h2 className="text-lg font-semibold text-surface-900 dark:text-white">{user?.full_name || user?.username}</h2>
                     <p className="text-sm text-surface-500">{user?.email}</p>
+                    <span className="badge-info mt-1">{user?.role?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Full Name</label>
-                    <input className="input" defaultValue={user?.full_name || ''} placeholder="John Doe" />
+                    <input
+                      className="input"
+                      value={profile.full_name}
+                      onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                      placeholder="John Doe"
+                    />
                   </div>
                   <div>
                     <label className="label">Username</label>
-                    <input className="input" defaultValue={user?.username || ''} disabled />
+                    <input className="input" value={user?.username || ''} disabled />
                   </div>
                   <div>
                     <label className="label">Email</label>
-                    <input type="email" className="input" defaultValue={user?.email || ''} placeholder="john@example.com" />
+                    <input
+                      type="email"
+                      className="input"
+                      value={profile.email}
+                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    />
                   </div>
                   <div>
                     <label className="label">Role</label>
@@ -131,21 +190,96 @@ export default function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Current Password</label>
-                    <input type="password" className="input" />
+                    <div className="relative">
+                      <input
+                        type={showPw ? 'text' : 'password'}
+                        className="input pr-10"
+                        value={passwordForm.current_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                      />
+                      <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="label">New Password</label>
-                    <input type="password" className="input" />
+                    <div className="relative">
+                      <input
+                        type={showNewPw ? 'text' : 'password'}
+                        className="input pr-10"
+                        placeholder="Min. 6 characters"
+                        value={passwordForm.new_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                      />
+                      <button type="button" onClick={() => setShowNewPw(!showNewPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                        {showNewPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="label">Confirm New Password</label>
-                    <input type="password" className="input" />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPw ? 'text' : 'password'}
+                        className="input pr-10"
+                        placeholder="Re-enter new password"
+                        value={passwordForm.confirm_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                      />
+                      <button type="button" onClick={() => setShowConfirmPw(!showConfirmPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                        {showConfirmPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="pt-2">
                   <button onClick={handleSavePassword} disabled={saving} className="btn-primary">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Update Password
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Notifications Tab */}
+            {activeTab === 'notifications' && (
+              <div className="card-body space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-surface-900 dark:text-white">Notifications</h2>
+                  <p className="text-sm text-surface-500 mt-1">Manage your notification preferences</p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-surface-50 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-700">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Bell className="w-5 h-5 text-primary-500" />
+                      <div>
+                        <p className="text-sm font-medium text-surface-900 dark:text-white">Email Notifications</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
+                          Receive pricing alerts, AI recommendation updates, and system notices
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setProfile((p) => ({ ...p, notifications_enabled: !p.notifications_enabled }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        profile.notifications_enabled ? 'bg-primary-600' : 'bg-surface-300'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          profile.notifications_enabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end">
+                  <button onClick={handleSaveProfile} disabled={saving} className="btn-primary">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save Preferences
                   </button>
                 </div>
               </div>
@@ -193,14 +327,14 @@ export default function Settings() {
                 {/* API Info */}
                 <div className="p-4 rounded-xl bg-surface-50 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-700">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-surface-900 dark:text-white">API Configuration</p>
-                      <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
-                        Backend API: http://localhost:8000
-                      </p>
-                      <p className="text-xs text-surface-500 dark:text-surface-400">
-                        App Version: 2.0.0
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-surface-500" />
+                      <div>
+                        <p className="text-sm font-medium text-surface-900 dark:text-white">API Configuration</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                          Backend API: http://localhost:8000 · App Version: 2.0.0
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -208,9 +342,14 @@ export default function Settings() {
                 {/* System Health */}
                 <div className="p-4 rounded-xl bg-surface-50 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-700">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-surface-900 dark:text-white">System Health</p>
-                      <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">All core systems operational</p>
+                    <div className="flex items-center gap-3">
+                      <Cpu className="w-5 h-5 text-surface-500" />
+                      <div>
+                        <p className="text-sm font-medium text-surface-900 dark:text-white">System Health</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                          All core systems operational · AI engine, API, and database online
+                        </p>
+                      </div>
                     </div>
                     <span className="badge-success">Healthy</span>
                   </div>

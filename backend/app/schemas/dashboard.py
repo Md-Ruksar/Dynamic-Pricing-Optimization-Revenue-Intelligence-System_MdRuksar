@@ -3,7 +3,7 @@ PricePilot AI - Dashboard Schemas
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 
 class CategorySummary(BaseModel):
@@ -28,9 +28,22 @@ class DashboardResponse(BaseModel):
     active_products: int
     total_categories: int
     average_price: float
-    categories: list[CategorySummary]
+    categories: List[CategorySummary]
     revenue_summary: RevenueSummary
     dataset_loaded: bool = False
     dataset_status: str = "No dataset loaded"
     recent_activity: list = []
     product_count: int = 0
+
+    # Enterprise KPIs
+    in_stock: int = 0
+    out_of_stock: int = 0
+    total_revenue: float = 0.0
+    total_datasets: int = 0
+    ai_status: str = "Not ready"
+
+    # Chart data
+    category_distribution: list = []
+    price_distribution: list = []
+    revenue_trend: list = []
+    recent_imports: list = []
