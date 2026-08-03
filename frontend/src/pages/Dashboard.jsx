@@ -3,10 +3,11 @@ import { dashboardAPI, activityAPI, aiAPI } from '../api/client';
 import {
   Package, TrendingUp, FolderOpen, DollarSign, Database, Activity,
   ArrowRight, RefreshCw, Loader2, AlertCircle, PackageCheck, PackageX,
-  BrainCircuit, FileSpreadsheet, Boxes,
+  BrainCircuit, FileSpreadsheet, Boxes, UserCheck, Clock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import usePendingRequests from '../hooks/usePendingRequests';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, PieChart, Pie, Cell, BarChart, Bar, Legend,
@@ -35,6 +36,7 @@ function SkeletonCards() {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { count: pendingRequests } = usePendingRequests();
   const [data, setData] = useState(null);
   const [activity, setActivity] = useState([]);
   const [aiStatus, setAiStatus] = useState(null);
@@ -129,6 +131,32 @@ export default function Dashboard() {
           Refresh
         </button>
       </div>
+
+      {/* Admin: pending access-request notification banner */}
+      {user?.role === 'admin' && pendingRequests > 0 && (
+        <div className="card !p-0 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-gradient-to-r from-amber-50 to-transparent dark:from-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex-shrink-0">
+                <UserCheck className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-surface-900 dark:text-white">
+                  {pendingRequests} pending access {pendingRequests === 1 ? 'request' : 'requests'}
+                </p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Users are waiting for administrator approval before they can sign in.
+                </p>
+              </div>
+            </div>
+            <Link to="/access-requests" className="btn-primary btn-sm flex-shrink-0">
+              <UserCheck className="w-4 h-4" />
+              Review Requests
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

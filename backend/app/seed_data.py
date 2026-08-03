@@ -278,6 +278,7 @@ def _ensure_demo_admin(db: Session):
         hashed_password=hash_password("admin123"),
         role="admin",
         is_active=True,
+        approval_status="approved",  # seeded admin is pre-approved
     )
     db.add(admin)
     db.flush()

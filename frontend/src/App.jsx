@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AccessPending from './pages/AccessPending';
+import AccessRequests from './pages/AccessRequests';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Pricing from './pages/Pricing';
@@ -75,6 +77,8 @@ function AppRoutes() {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+      {/* Pending-approval screen (no session yet - identity verified, awaiting admin) */}
+      <Route path="/access-pending" element={<PublicRoute><AccessPending /></PublicRoute>} />
 
       {/* Protected routes */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -85,6 +89,7 @@ function AppRoutes() {
         <Route path="/datasets" element={<Datasets />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<AdminRoute><Users /></AdminRoute>} />
+        <Route path="/access-requests" element={<AdminRoute><AccessRequests /></AdminRoute>} />
         <Route path="/settings" element={<Settings />} />
       </Route>
 

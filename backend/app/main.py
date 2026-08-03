@@ -18,6 +18,7 @@ from app.routers import dashboard
 from app.routers import pricing
 from app.routers import datasets
 from app.routers import users
+from app.routers import access_requests
 
 # Enterprise modules
 from app.routers import ai
@@ -38,9 +39,11 @@ async def lifespan(app: FastAPI):
     from app.database import migrate_schema
     migrate_schema()
 
-    # Create database tables on startup (includes new Dataset / ImportLog / Recommendation models)
+    # Create database tables on startup (includes new Dataset / ImportLog /
+    # Recommendation / AccessRequest models)
     import app.models.dataset  # noqa: F401 - register models
     import app.models.recommendation  # noqa: F401
+    import app.models.access_request  # noqa: F401
     Base.metadata.create_all(bind=engine)
     
     # Seed sample products if database is empty
@@ -89,6 +92,7 @@ app.include_router(dashboard.router)
 app.include_router(pricing.router)
 app.include_router(datasets.router)
 app.include_router(users.router)
+app.include_router(access_requests.router)
 app.include_router(ai.router)
 app.include_router(reports.router)
 app.include_router(sales.router)

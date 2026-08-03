@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useForm } from 'react-hook-form';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 import {
-  Sparkles, Eye, EyeOff, Loader2, CheckCircle2,
+  Sparkles, Eye, EyeOff, Loader2, CheckCircle2, RotateCcw,
 } from 'lucide-react';
 
 export default function Login() {
@@ -13,6 +13,7 @@ export default function Login() {
   const location = useLocation();
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [rejectedMessage, setRejectedMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -32,15 +33,30 @@ export default function Login() {
   const onSubmit = async (data) => {
     setError('');
     setSuccessMsg('');
+    setRejectedMessage('');
     setLoading(true);
     try {
-      await login(data);
+      const result = await login(data);
+      // Account verified but awaiting administrator approval - no session issued.
+      if (result?.access_pending) {
+        sessionStorage.setItem('pending_email', result.email || '');
+        sessionStorage.setItem('pending_name', result.name || '');
+        navigate('/access-pending', {
+          state: { email: result.email, name: result.name, provider: result.provider },
+        });
+        return;
+      }
       navigate('/dashboard');
     } catch (err) {
       if (err.response?.status === 401) {
         setError('Invalid username or password. Please try again.');
       } else if (err.response?.status === 403) {
-        setError('Your account has been deactivated. Contact your administrator.');
+        setError(err.response?.data?.detail || 'Your account has been deactivated. Contact your administrator.');
+        // Rejected access requests can be re-submitted from the sign-up page
+        if (String(err.response?.data?.detail || '').toLowerCase().includes('rejected')) {
+          setError('');
+          setRejectedMessage(err.response?.data?.detail || 'Your access request was rejected by the administrator.');
+        }
       } else {
         setError(err.response?.data?.detail || 'Sign in failed. Please try again.');
       }
@@ -79,6 +95,21 @@ export default function Login() {
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
               {error}
+            </div>
+          )}
+
+          {/* Rejected request - re-request path */}
+          {rejectedMessage && (
+            <div className="mb-5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-600 dark:text-amber-400">
+              <p>{rejectedMessage}</p>
+              <button
+                type="button"
+                onClick={() => navigate('/register', { state: { reRequest: true } })}
+                className="mt-2 inline-flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-300 hover:underline"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Request access again
+              </button>
             </div>
           )}
 
@@ -153,8 +184,11 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Google Sign-In Button (official OAuth) */}
+          {/* Google Sign-In Button (official OAuth - admin accounts only) */}
           <GoogleSignInButton />
+          <p className="mt-2 text-center text-[11px] text-surface-400 dark:text-surface-500">
+            Google sign-in is available for administrator accounts only.
+          </p>
 
           {/* Register link */}
           <div className="mt-6 text-center">

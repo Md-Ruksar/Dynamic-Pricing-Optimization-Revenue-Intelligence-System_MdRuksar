@@ -6,6 +6,9 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 
+#: The only roles PricePilot AI assigns.
+ROLES = ["admin", "data_analyst", "pricing_manager"]
+
 
 class UserBase(BaseModel):
     """Base user schema."""
@@ -17,7 +20,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     """Schema for creating a new user."""
     password: str
-    role: Optional[str] = "business_user"
+    role: Optional[str] = "data_analyst"
+    reason: Optional[str] = None  # used by self-registration / re-request
     
     @field_validator("password")
     @classmethod
@@ -29,9 +33,8 @@ class UserCreate(UserBase):
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
-        allowed = ["admin", "business_user", "pricing_manager"]
-        if v not in allowed:
-            raise ValueError(f"Role must be one of: {', '.join(sorted(allowed))}")
+        if v not in ROLES:
+            raise ValueError(f"Role must be one of: {', '.join(sorted(ROLES))}")
         return v
 
 

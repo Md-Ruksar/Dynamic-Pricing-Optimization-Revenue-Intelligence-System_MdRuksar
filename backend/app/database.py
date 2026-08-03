@@ -58,6 +58,7 @@ def _migrate_sqlite():
             "notifications_enabled": "BOOLEAN DEFAULT 1",
             "profile_picture": "VARCHAR(500)",
             "is_google_user": "BOOLEAN DEFAULT 0",
+            "approval_status": "VARCHAR(20) DEFAULT 'approved'",
         }
         for col, ddl in user_additions.items():
             if col not in users_cols:
@@ -78,21 +79,22 @@ def _migrate_sqlite():
                 email VARCHAR(100) NOT NULL UNIQUE,
                 full_name VARCHAR(100),
                 hashed_password VARCHAR(255),
-                role VARCHAR(20) NOT NULL DEFAULT 'business_user',
+                role VARCHAR(20) NOT NULL DEFAULT 'data_analyst',
                 is_active BOOLEAN DEFAULT 1,
                 google_id VARCHAR(100),
                 profile_picture VARCHAR(500),
                 is_google_user BOOLEAN DEFAULT 0,
                 avatar_url VARCHAR(500),
                 notifications_enabled BOOLEAN DEFAULT 1,
+                approval_status VARCHAR(20) DEFAULT 'approved',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )""")
             cur.execute("""INSERT INTO users (id, username, email, full_name, hashed_password,
                 role, is_active, google_id, profile_picture, is_google_user,
-                avatar_url, notifications_enabled, created_at)
+                avatar_url, notifications_enabled, approval_status, created_at)
                 SELECT id, username, email, full_name, hashed_password,
                 role, is_active, google_id, profile_picture, is_google_user,
-                avatar_url, notifications_enabled, created_at
+                avatar_url, notifications_enabled, approval_status, created_at
                 FROM users_old""")
             cur.execute("DROP TABLE users_old")
             # Recreate the named indexes SQLAlchemy expects (dropped with users_old)
@@ -101,6 +103,33 @@ def _migrate_sqlite():
             cur.execute("CREATE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)")
 
         # Datasets / import_logs tables (create_all handles them, but ensure they exist)
+        # Backfill approval_status for pre-existing users (defaults to 'approved'
+        # via the column default, but make it explicit so existing accounts work)
+        try:
+            cur.execute("UPDATE users SET approval_status = 'approved' WHERE approval_status IS NULL")
+        except Exception:
+            pass
+
+        # Role set migration: the old 'business_user' role was replaced by
+        # 'data_analyst' (the role set is now admin / data_analyst / pricing_manager)
+        try:
+            cur.execute("UPDATE users SET role = 'data_analyst' WHERE role = 'business_user'")
+        except Exception:
+            pass
+        try:
+            cur.execute("UPDATE access_requests SET requested_role = 'data_analyst' WHERE requested_role = 'business_user'")
+        except Exception:
+            pass
+
+        # access_requests.reason column (create_all won't add columns to an
+        # existing table - reconcile manually for pre-existing SQLite DBs)
+        try:
+            ar_cols = {row[1] for row in cur.execute("PRAGMA table_info(access_requests)").fetchall()}
+            if "reason" not in ar_cols:
+                cur.execute("ALTER TABLE access_requests ADD COLUMN reason TEXT")
+        except Exception:
+            pass
+
         existing = {row[0] for row in cur.execute(
             "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         if "datasets" not in existing:
@@ -169,6 +198,7 @@ def _migrate_postgres():
             "notifications_enabled": "BOOLEAN DEFAULT TRUE",
             "profile_picture": "VARCHAR(500)",
             "is_google_user": "BOOLEAN DEFAULT FALSE",
+            "approval_status": "VARCHAR(20) DEFAULT 'approved'",
         }
         for col, ddl in additions.items():
             if col not in existing:
@@ -189,6 +219,17 @@ def _migrate_postgres():
         # 3. Create the google_id index the model declares (create_all won't
         #    add indexes to an already-existing table)
         cur.execute("CREATE INDEX IF NOT EXISTS ix_users_google_id ON users (google_id)")
+
+        # 3b. Backfill approval_status for existing accounts: every pre-existing
+        #     user stays approved and keeps working (only new self-registrations
+        #     are 'pending').
+        cur.execute("UPDATE users SET approval_status = 'approved' WHERE approval_status IS NULL")
+
+        # 3c. Role set migration: 'business_user' was replaced by 'data_analyst'
+        #     (the role set is now admin / data_analyst / pricing_manager).
+        cur.execute("UPDATE users SET role = 'data_analyst' WHERE role = 'business_user'")
+        print("PostgreSQL migration: migrated business_user role to data_analyst")
+        cur.execute("UPDATE access_requests SET requested_role = 'data_analyst' WHERE requested_role = 'business_user'")
 
         # 4. Reconcile the remaining model tables against the current SQLAlchemy
         #    models. Pre-existing tables may predate columns added later (e.g.
@@ -234,12 +275,14 @@ def _migrate_postgres():
         from app.models.pricing_history import PricingHistory
         from app.models.activity_log import ActivityLog
         from app.models.forecast import ForecastRun
+        from app.models.access_request import AccessRequest
 
         reconcile = [
             ("products", Product), ("sales", Sale),
             ("recommendations", Recommendation), ("datasets", Dataset),
             ("import_logs", ImportLog), ("pricing_history", PricingHistory),
             ("activity_logs", ActivityLog), ("forecast_runs", ForecastRun),
+            ("access_requests", AccessRequest),
         ]
         for table_name, model in reconcile:
             cur.execute("SELECT to_regclass(%s)", (f"public.{table_name}",))

@@ -1,21 +1,26 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getSidebarItems } from '../config/features';
+import usePendingRequests from '../hooks/usePendingRequests';
 import {
   LayoutDashboard, Package, DollarSign, Database, Users,
   Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp,
-  Sparkles, BrainCircuit, BarChart3,
+  Sparkles, BrainCircuit, BarChart3, UserCheck,
 } from 'lucide-react';
 
 const iconMap = {
   LayoutDashboard, Package, DollarSign, Database, Users, Settings,
-  BrainCircuit, BarChart3,
+  BrainCircuit, BarChart3, UserCheck,
 };
 
 export default function Sidebar({ collapsed, onToggle }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const sidebarItems = getSidebarItems();
+  const { count: pendingRequests } = usePendingRequests();
+  // Admin-only items (e.g. Access Requests) are hidden from other roles.
+  const sidebarItems = getSidebarItems().filter(
+    (item) => !item.adminOnly || user?.role === 'admin'
+  );
 
   const handleLogout = () => {
     logout();
@@ -61,6 +66,16 @@ export default function Sidebar({ collapsed, onToggle }) {
               <Icon className="w-5 h-5 flex-shrink-0" />
               {!collapsed && (
                 <span className="truncate">{item.label}</span>
+              )}
+              {/* Pending access-request badge (admin notification) */}
+              {item.path === '/access-requests' && pendingRequests > 0 && (
+                <span
+                  className={`ml-auto flex-shrink-0 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold leading-none ${
+                    collapsed ? 'absolute -top-0.5 -right-0.5' : ''
+                  }`}
+                >
+                  {pendingRequests > 99 ? '99+' : pendingRequests}
+                </span>
               )}
               {collapsed && (
                 <div className="absolute left-full ml-2 px-2 py-1 bg-surface-900 dark:bg-surface-100 text-white dark:text-surface-900 text-xs rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">

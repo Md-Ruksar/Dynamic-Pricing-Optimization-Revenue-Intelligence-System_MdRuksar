@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     
+    # Email (SMTP) - used for approval/rejection notifications
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "PricePilot AI <noreply@pricepilot.ai>"
+    SMTP_USE_TLS: bool = True
+    
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 

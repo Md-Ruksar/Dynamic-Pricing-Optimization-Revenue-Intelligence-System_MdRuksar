@@ -1,15 +1,23 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useForm } from 'react-hook-form';
-import { Sparkles, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Sparkles, Eye, EyeOff, Loader2, ShieldCheck, RotateCcw } from 'lucide-react';
+
+const ROLE_OPTIONS = [
+  { value: 'data_analyst', label: 'Data Analyst' },
+  { value: 'pricing_manager', label: 'Pricing Manager' },
+  { value: 'admin', label: 'Admin' },
+];
 
 export default function Register() {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isReRequest = location.state?.reRequest === true;
 
   const {
     register,
@@ -21,7 +29,17 @@ export default function Register() {
     setError('');
     setLoading(true);
     try {
-      await registerUser(data);
+      const result = await registerUser(data);
+      // Self-registration runs through the admin approval workflow (and a
+      // rejected user re-registering creates a fresh access request).
+      if (result?.access_pending) {
+        sessionStorage.setItem('pending_email', result.email || '');
+        sessionStorage.setItem('pending_name', result.name || '');
+        navigate('/access-pending', {
+          state: { email: result.email, name: result.name, provider: result.provider },
+        });
+        return;
+      }
       navigate('/login', { state: { message: 'Registration successful! Please sign in.' } });
     } catch (err) {
       setError(err.response?.data?.detail?.[0]?.msg || err.response?.data?.detail || 'Registration failed. Please try again.');
@@ -39,15 +57,23 @@ export default function Register() {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-surface-900 dark:text-white">
-            Create your account
+            {isReRequest ? 'Request access again' : 'Create your account'}
           </h1>
           <p className="text-surface-500 dark:text-surface-400 mt-1">
-            Get started with PricePilot AI
+            {isReRequest
+              ? 'Your previous request was not approved. Submit a new request for administrator review.'
+              : 'Get started with PricePilot AI'}
           </p>
         </div>
 
         {/* Register form */}
         <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-xl border border-surface-200 dark:border-surface-700 p-8">
+          {isReRequest && (
+            <div className="mb-5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 flex-shrink-0" />
+              Submitting this form creates a brand-new request for administrator approval.
+            </div>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (
               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
@@ -119,9 +145,37 @@ export default function Register() {
               )}
             </div>
 
+            <div>
+              <label className="label flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-primary-500" />
+                Requested Role
+              </label>
+              <select
+                className="input"
+                defaultValue="data_analyst"
+                {...register('role', { required: 'Role is required' })}
+              >
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-surface-400 mt-1">
+                You may request a role; an administrator assigns the final role when approving your access.
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Reason for Access (optional)</label>
+              <textarea
+                className="input min-h-[72px] resize-y"
+                placeholder="e.g. I work with pricing data for the retail team"
+                {...register('reason')}
+              />
+            </div>
+
             <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? 'Submitting...' : (isReRequest ? 'Submit New Request' : 'Create account')}
             </button>
           </form>
 

@@ -40,7 +40,10 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     const response = await authAPI.login(credentials);
-    return storeSession(response.data);
+    const data = response.data;
+    // Pending-approval users get an access_pending payload, never a session.
+    if (data?.access_pending) return data;
+    return storeSession(data);
   };
 
   const register = async (userData) => {
@@ -50,7 +53,9 @@ export function AuthProvider({ children }) {
 
   const googleLogin = async (idToken) => {
     const response = await authAPI.google(idToken);
-    return storeSession(response.data);
+    const data = response.data;
+    if (data?.access_pending) return data;
+    return storeSession(data);
   };
 
   const updateUser = (userData) => {

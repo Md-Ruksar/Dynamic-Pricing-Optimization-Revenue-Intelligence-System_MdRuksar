@@ -18,8 +18,11 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False, index=True)
     full_name = Column(String(100))
     hashed_password = Column(String(255), nullable=True)  # NULL for Google-only accounts
-    role = Column(String(20), nullable=False, default="business_user")
+    role = Column(String(20), nullable=False, default="data_analyst")
     is_active = Column(Boolean, default=True)
+    # pending | approved | rejected - gates JWT issuance & protected APIs.
+    # Existing accounts are backfilled to 'approved' by the startup migration.
+    approval_status = Column(String(20), nullable=False, default="approved")
     google_id = Column(String(100), index=True, nullable=True)
     profile_picture = Column(String(500), nullable=True)
     is_google_user = Column(Boolean, default=False, nullable=True)

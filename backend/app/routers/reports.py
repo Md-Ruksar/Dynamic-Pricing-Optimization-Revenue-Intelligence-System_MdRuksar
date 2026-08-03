@@ -140,8 +140,8 @@ def get_users_report(
         "inactive_users": sum(1 for u in users if not u.is_active),
         "role_breakdown": {
             "admin": sum(1 for u in users if u.role == "admin"),
+            "data_analyst": sum(1 for u in users if u.role == "data_analyst"),
             "pricing_manager": sum(1 for u in users if u.role == "pricing_manager"),
-            "business_user": sum(1 for u in users if u.role == "business_user"),
         },
         "users": [
             {

@@ -56,8 +56,17 @@ export default function GoogleSignInButton({ text = 'Continue with Google', clas
     if (!idToken) return;
     setLoading(true);
     try {
-      const user = await googleLogin(idToken);
-      toast.success('Signed in with Google', `Welcome, ${user.full_name || user.email}`);
+      const result = await googleLogin(idToken);
+      // Verified Google identity but awaiting admin approval - no session issued.
+      if (result?.access_pending) {
+        sessionStorage.setItem('pending_email', result.email || '');
+        sessionStorage.setItem('pending_name', result.name || '');
+        navigate('/access-pending', {
+          state: { email: result.email, name: result.name, provider: result.provider },
+        });
+        return;
+      }
+      toast.success('Signed in with Google', `Welcome, ${result.full_name || result.email}`);
       navigate('/dashboard');
     } catch (err) {
       const status = err.response?.status;

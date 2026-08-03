@@ -108,9 +108,9 @@ export default function Reports() {
           <div className="stat-card">
             <span className="stat-label">Roles</span>
             <span className="text-base font-bold text-surface-900 dark:text-white">
-              Admin {data.role_breakdown?.admin} · PM {data.role_breakdown?.pricing_manager} · BU {data.role_breakdown?.business_user}
+              Admin {data.role_breakdown?.admin} · DA {data.role_breakdown?.data_analyst} · PM {data.role_breakdown?.pricing_manager}
             </span>
-            <span className="stat-description">Admin / Pricing Manager / Business User</span>
+            <span className="stat-description">Admin / Data Analyst / Pricing Manager</span>
           </div>
         </div>
       );

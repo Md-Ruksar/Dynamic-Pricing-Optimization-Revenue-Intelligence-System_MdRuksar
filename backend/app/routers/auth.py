@@ -19,18 +19,20 @@ from app.services.google_oauth import GoogleOAuthService
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=Dict, status_code=status.HTTP_201_CREATED)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user.
+    """Request access to the platform.
 
-    Public self-registration always creates a ``business_user`` account.
-    Role assignment is restricted to admins via the User Management endpoints
-    (POST /api/v1/users/), so a client can never self-assign admin privileges.
+    Public self-registration runs through the enterprise approval workflow: a
+    pending (inactive) user account plus an AccessRequest are created, and no
+    JWT is issued until an administrator approves the request. The client can
+    request a role (admin / data_analyst / pricing_manager) but can never
+    self-assign one; admins choose the final role at approval time via the
+    Access Requests page. Rejected users may re-register to submit a new
+    request (re-request flow).
     """
     auth_service = AuthService(db)
-    user_data = user_data.model_copy(update={"role": "business_user"})
-    user = auth_service.register(user_data)
-    return user
+    return auth_service.request_access(user_data)
 
 
 @router.post("/login", response_model=Dict)

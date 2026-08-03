@@ -12,6 +12,7 @@ const FEATURES = {
   DATASETS: true,
   USERS: true,
   SETTINGS: true,
+  ACCESS_REQUESTS: true,
 
   // Enterprise modules - Active
   AI_PRICING: true,
@@ -59,6 +60,7 @@ export function getSidebarItems() {
     { label: 'Dataset Management', path: '/datasets', icon: 'Database', feature: 'DATASETS' },
     { label: 'Reports', path: '/reports', icon: 'BarChart3', feature: 'REPORTS' },
     { label: 'User Management', path: '/users', icon: 'Users', feature: 'USERS' },
+    { label: 'Access Requests', path: '/access-requests', icon: 'UserCheck', feature: 'ACCESS_REQUESTS', adminOnly: true },
     { label: 'Settings', path: '/settings', icon: 'Settings', feature: 'SETTINGS' },
   ];
 

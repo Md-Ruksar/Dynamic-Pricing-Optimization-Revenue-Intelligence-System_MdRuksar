@@ -16,7 +16,7 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [formData, setFormData] = useState({ username: '', email: '', password: '', full_name: '', role: 'business_user' });
+  const [formData, setFormData] = useState({ username: '', email: '', password: '', full_name: '', role: 'data_analyst' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -42,7 +42,7 @@ export default function Users() {
 
   const openCreate = () => {
     setEditingUser(null);
-    setFormData({ username: '', email: '', password: '', full_name: '', role: 'business_user' });
+    setFormData({ username: '', email: '', password: '', full_name: '', role: 'data_analyst' });
     setError('');
     setModalOpen(true);
   };
@@ -129,6 +129,7 @@ export default function Users() {
     switch (role) {
       case 'admin': return <ShieldAlert className="w-4 h-4 text-red-500" />;
       case 'pricing_manager': return <ShieldCheck className="w-4 h-4 text-primary-500" />;
+      case 'data_analyst': return <Shield className="w-4 h-4 text-emerald-500" />;
       default: return <Shield className="w-4 h-4 text-surface-400" />;
     }
   };
@@ -137,6 +138,7 @@ export default function Users() {
     switch (role) {
       case 'admin': return 'badge-danger';
       case 'pricing_manager': return 'badge-info';
+      case 'data_analyst': return 'badge-success';
       default: return 'badge-neutral';
     }
   };
@@ -314,7 +316,7 @@ export default function Users() {
               <div>
                 <label className="label">Role</label>
                 <select className="input" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
-                  <option value="business_user">Business User</option>
+                  <option value="data_analyst">Data Analyst</option>
                   <option value="pricing_manager">Pricing Manager</option>
                   <option value="admin">Admin</option>
                 </select>

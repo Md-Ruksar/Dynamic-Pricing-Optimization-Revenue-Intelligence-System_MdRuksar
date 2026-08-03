@@ -191,6 +191,14 @@ export const activityAPI = {
   getLogs: (params) => apiClient.get('/api/v1/activity/logs', { params }),
 };
 
+// ======== Access Requests API (admin approval workflow) ========
+export const accessRequestsAPI = {
+  list: (params) => apiClient.get('/api/v1/access-requests/', { params }),
+  pendingCount: () => apiClient.get('/api/v1/access-requests/pending-count'),
+  approve: (requestId, role) => apiClient.post(`/api/v1/access-requests/${requestId}/approve`, { role }),
+  reject: (requestId) => apiClient.post(`/api/v1/access-requests/${requestId}/reject`),
+};
+
 // ======== Reports API ========
 export const reportsAPI = {
   revenue: () => apiClient.get('/api/v1/reports/revenue'),

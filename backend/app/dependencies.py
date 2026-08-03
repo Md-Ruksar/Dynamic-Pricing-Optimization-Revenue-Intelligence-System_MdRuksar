@@ -46,6 +46,12 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive",
         )
+    if user.approval_status not in (None, "approved"):
+        # Pending/rejected users must never reach protected APIs, even with a token.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account pending administrator approval",
+        )
     return user
 
 
