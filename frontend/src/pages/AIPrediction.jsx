@@ -25,7 +25,11 @@ export default function AIPrediction() {
   const [saveTarget, setSaveTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
-  const [tab, setTab] = useState('optimization');
+  // Deep-link support: /ai?tab=forecasting opens the Demand Forecasting tab
+  // (used by the dashboard's "Generate Forecast" quick action).
+  const [tab, setTab] = useState(
+    () => new URLSearchParams(window.location.search).get('tab') === 'forecasting' ? 'forecasting' : 'optimization'
+  );
 
   const isAdminOrPricing = user?.role === 'admin' || user?.role === 'pricing_manager';
 
